@@ -47,4 +47,20 @@ describe("computeCostUsd (Story 1.4 NFR-L3, pure)", () => {
       computeCostUsd("gpt-whatever", { inputTokens: 999, outputTokens: 999 }),
     ).toBe(0);
   });
+
+  it("negative / NaN token counts never yield a negative cost", () => {
+    expect(
+      computeCostUsd("claude-sonnet-4-6", {
+        inputTokens: -100,
+        outputTokens: Number.NaN,
+      }),
+    ).toBe(0);
+    expect(
+      computeCostUsd("claude-sonnet-4-6", {
+        inputTokens: 1_000_000,
+        outputTokens: -5,
+        cacheReadInputTokens: -1,
+      }),
+    ).toBe(3); // only the valid 1M input @ $3 counts
+  });
 });

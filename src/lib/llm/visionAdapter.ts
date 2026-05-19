@@ -27,6 +27,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/lib/db/client";
 import { llmCosts } from "@/db/schema";
 import {
+  MAX_PARSE_PAGES,
   PARSED_RECEIPT_JSON_SCHEMA,
   ParsedReceiptSchema,
   type ParsedReceipt,
@@ -39,7 +40,10 @@ import {
   isRetryableStatus,
 } from "@/lib/llm/retry";
 
-const MAX_TOKENS = 8000;
+// A ≤5-page receipt's JSON can exceed 8K output tokens; 16K stays under
+// the non-streaming SDK HTTP-timeout guidance while avoiding the silent
+// max_tokens-truncation → degrade path on multi-page receipts.
+const MAX_TOKENS = 16_000;
 
 const SYSTEM_INSTRUCTION =
   "你是收據解析器。輸入是一張或多張同一張收據的連續分頁影像（已遮蔽會員卡號），順序為收據由上到下。" +
@@ -123,11 +127,20 @@ export async function parseReceiptImages(
   mimeTypes: string[],
   ctx: ParseContext,
 ): Promise<ParseOutcome> {
-  if (images.length === 0) {
+  // Re-validate the boundary input (the 1.3 producer bounds pageCount,
+  // but this is THE single Claude boundary): no images / array length
+  // mismatch / over the page cap / any empty image → fail friendly
+  // WITHOUT burning paid Claude calls.
+  if (
+    images.length === 0 ||
+    images.length !== mimeTypes.length ||
+    images.length > MAX_PARSE_PAGES ||
+    images.some((d) => !d || d.length === 0)
+  ) {
     return { kind: "failed", message: FRIENDLY_FAIL };
   }
-  if (!process.env.ANTHROPIC_API_KEY) {
-    // No key in this environment: degrade gracefully, do NOT crash the
+  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
+    // No (usable) key in this env: degrade gracefully, do NOT crash the
     // worker. Real-Claude verification is deferred (W-1-4-1).
     console.warn(
       "[visionAdapter] ANTHROPIC_API_KEY not set — friendly degrade (W-1-4-1).",
@@ -135,7 +148,13 @@ export async function parseReceiptImages(
     return { kind: "failed", message: FRIENDLY_FAIL };
   }
 
-  const client = new Anthropic();
+  let client: Anthropic;
+  try {
+    client = new Anthropic();
+  } catch {
+    // Constructor must never leak a raw error (NFR-R1).
+    return { kind: "failed", message: FRIENDLY_FAIL };
+  }
   const content = [
     ...images.map((data, i) => ({
       type: "image" as const,
@@ -175,9 +194,15 @@ export async function parseReceiptImages(
 
       const latency = Date.now() - startedAt;
 
-      if (resp.stop_reason === "refusal" || resp.stop_reason === "max_tokens") {
+      if (resp.stop_reason !== "end_turn") {
+        // refusal / max_tokens / pause_turn / anything not a clean
+        // completion → structural failure, degrade. Diagnostic logs
+        // the reason only (no raw content / no image bytes).
+        console.warn(
+          `[visionAdapter] non-end_turn stop_reason=${resp.stop_reason} model=${model}`,
+        );
         await recordCost(ctx, model, resp.usage, latency, false);
-        continue; // structural / refusal → next attempt (degrade)
+        continue;
       }
 
       const textBlock = resp.content.find((b) => b.type === "text");
@@ -187,32 +212,55 @@ export async function parseReceiptImages(
       try {
         parsed = ParsedReceiptSchema.parse(JSON.parse(raw)); // NFR-L2
       } catch {
+        // Distinguish "no text" vs "invalid JSON/shape" for ops — never
+        // log the content itself (NFR-S3).
+        console.warn(
+          `[visionAdapter] response not schema-valid model=${model} textLen=${raw.length}`,
+        );
         await recordCost(ctx, model, resp.usage, latency, false);
         continue; // invalid structure → degrade
       }
 
       await recordCost(ctx, model, resp.usage, latency, true);
-      // `degraded` true if we didn't succeed on the primary model's
-      // first attempt.
-      const degraded = !(model === DEGRADATION_MODELS[0] && attempt === 1);
+      // Degraded ONLY if we fell back OFF the primary model. A
+      // transient retry that still succeeded on the primary model is a
+      // clean success, not a degradation (architecture L266-270 =
+      // model fallback).
+      const degraded = model !== DEGRADATION_MODELS[0];
       return { kind: "parsed", receipt: parsed, degraded };
     } catch (err) {
       const latency = Date.now() - startedAt;
       await recordCost(ctx, model, null, latency, false);
       const status = statusOf(err);
-      if (isRetryableStatus(status)) {
-        // Transient: back off, then the NEXT plan step (same model
-        // until its retries are exhausted, then the cheaper model).
-        const isLastStep = i === plan.length - 1;
-        if (!isLastStep) {
+
+      // Auth/permission is fatal for EVERY model (same API key) —
+      // abort the whole chain immediately; degrading is pointless.
+      if (status === 401 || status === 403) {
+        console.error(
+          `[visionAdapter] fatal auth status=${status} — aborting chain`,
+        );
+        return { kind: "failed", message: FRIENDLY_FAIL };
+      }
+
+      // Retryable = explicit transient status OR a network-level error
+      // (no HTTP status: ECONNRESET / DNS / timeout — a retry likely
+      // helps).
+      const retryable = status === undefined || isRetryableStatus(status);
+      if (retryable) {
+        if (i < plan.length - 1) {
           await new Promise((r) =>
             setTimeout(r, backoffWithJitterMs(attempt)),
           );
-          continue;
         }
+        continue; // next attempt (same model until its retries used up)
       }
-      // Non-retryable (4xx) → still try degrading to the next model;
-      // the loop continues. Raw error never escapes.
+
+      // Non-retryable (e.g. 400) won't change on a retry of the SAME
+      // model — skip straight to the next model (don't burn its
+      // remaining attempts on identical failures).
+      const next = plan.findIndex((s, j) => j > i && s.model !== model);
+      if (next === -1) break; // no other model left → friendly fail
+      i = next - 1; // the loop's i++ lands exactly on `next`
       continue;
     }
   }

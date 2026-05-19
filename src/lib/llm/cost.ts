@@ -24,15 +24,21 @@ export interface TokenUsage {
  * is still logged to llm_costs for telemetry; cost just can't be
  * priced — non-fatal, never throws).
  */
+/** Non-negative finite token count; negative / NaN / undefined → 0
+ *  (a negative or NaN usage value must never yield a negative cost). */
+function tok(v: number | null | undefined): number {
+  return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : 0;
+}
+
 export function computeCostUsd(model: string, u: TokenUsage): number {
   const p = MODEL_PRICING[model];
   if (!p) return 0;
   const M = 1_000_000;
-  const input = ((u.inputTokens || 0) * p.inUsdPerMTok) / M;
+  const input = (tok(u.inputTokens) * p.inUsdPerMTok) / M;
   const cacheWrite =
-    ((u.cacheCreationInputTokens || 0) * p.inUsdPerMTok * 1.25) / M;
+    (tok(u.cacheCreationInputTokens) * p.inUsdPerMTok * 1.25) / M;
   const cacheRead =
-    ((u.cacheReadInputTokens || 0) * p.inUsdPerMTok * 0.1) / M;
-  const output = ((u.outputTokens || 0) * p.outUsdPerMTok) / M;
+    (tok(u.cacheReadInputTokens) * p.inUsdPerMTok * 0.1) / M;
+  const output = (tok(u.outputTokens) * p.outUsdPerMTok) / M;
   return Math.round((input + cacheWrite + cacheRead + output) * 1e6) / 1e6;
 }

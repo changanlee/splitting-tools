@@ -35,8 +35,17 @@ export async function registerParseWorker(boss: PgBoss): Promise<void> {
   await boss.work(
     PARSE_QUEUE,
     async (jobs: { id: string; data: ParseJobPayload }[]) => {
+      // pg-boss `work` defaults to one job per call; we still process
+      // the WHOLE array (never `return` mid-loop) so a future batch>1
+      // can't silently drop jobs. `output` is the parsed receipt (the
+      // 1.4→1.5 hand-off; one-job contract).
+      let output: unknown = undefined;
       for (const job of jobs) {
         const data = job.data;
+        if (!data || !data.jobId) {
+          console.error("[parseWorker] job missing data/jobId — skipped");
+          continue;
+        }
         try {
           await markJobStatus(data.jobId, "processing");
           const outcome = await parseReceiptImages(
@@ -45,25 +54,47 @@ export async function registerParseWorker(boss: PgBoss): Promise<void> {
             { sessionId: data.sessionId, jobId: data.jobId },
           );
           if (outcome.kind === "parsed") {
-            await markJobStatus(
-              data.jobId,
-              outcome.degraded ? "degraded" : "succeeded",
+            // Guard the TERMINAL write: a DB blip here must NOT rethrow
+            // (pg-boss would re-run the whole Claude parse — the design
+            // explicitly avoids that) and must still leave a terminal
+            // state (NFR-R2 — payer never deadlocked).
+            try {
+              await markJobStatus(
+                data.jobId,
+                outcome.degraded ? "degraded" : "succeeded",
+              );
+            } catch (e) {
+              console.error(
+                "[parseWorker] terminal markJobStatus failed:",
+                e instanceof Error ? e.message : String(e),
+              );
+              await markJobFailed(data.jobId, FRIENDLY_UNEXPECTED).catch(
+                () => {},
+              );
+            }
+            output = outcome.receipt; // pg-boss job output (W-1-4-3)
+          } else {
+            // Friendly terminal failure (visionAdapter exhausted its
+            // chain). Resolve — never throw (no pg-boss double retry).
+            await markJobFailed(data.jobId, outcome.message).catch((e) =>
+              console.error(
+                "[parseWorker] markJobFailed:",
+                e instanceof Error ? e.message : String(e),
+              ),
             );
-            // Returned → persisted as pg-boss job output (1.4→1.5
-            // hand-off; no app table — W-1-4-3).
-            return outcome.receipt;
           }
-          // Friendly terminal failure (visionAdapter exhausted its
-          // chain). Resolve — do NOT throw (no double retry).
-          await markJobFailed(data.jobId, outcome.message);
         } catch (e) {
-          // visionAdapter never throws raw, but stay defensive: reach a
-          // terminal state, friendly only (NFR-R1/R2).
-          console.error("[parseWorker] unexpected error:", e);
+          // visionAdapter never throws raw; stay defensive. Log only
+          // the message (NEVER the full error object — it could carry
+          // request/image context; NFR-S3). Reach a terminal state.
+          console.error(
+            "[parseWorker] unexpected error:",
+            e instanceof Error ? e.message : String(e),
+          );
           await markJobFailed(data.jobId, FRIENDLY_UNEXPECTED).catch(() => {});
         }
       }
-      return undefined;
+      return output;
     },
   );
 }

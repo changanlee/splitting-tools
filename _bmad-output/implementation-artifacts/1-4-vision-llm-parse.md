@@ -1,6 +1,6 @@
 # Story 1.4: 單次視覺 LLM 解析與縮寫品名還原（LLM-Ops 包裹）
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -150,3 +150,27 @@ claude-opus-4-7[1m]（dev-story，2026-05-20）
 - `src/features/parsing/__tests__/regression-invariants.test.ts`（M：REAL #5564 it.todo 註記，anchor 保留）
 - `package.json`（M：+@anthropic-ai/sdk@0.96.0）
 - `_bmad-output/implementation-artifacts/{1-4-...md,sprint-status.yaml,deferred-work.md}`（M）
+
+## Review Findings（code review 2026-05-20，**full 模式**，commit 114f947，4 hunters）
+
+> Blind / Edge Case / Acceptance Auditor / **LLM Compliance**。
+> **LLM Compliance = CLEAN（zero findings）**：7 不可協商項逐項 file:line
+> 驗證——item1 retry≥3 jitter 真實 await、item2/5 每次嘗試 llm_costs 全欄、
+> item4 降級鏈+原始錯誤零外洩、item3 ⏸1.3 wiring 完好、item6 N/A、item7
+> ⏸1.7 seam 未動、唯一 Anthropic import=visionAdapter、無未登記 P0。
+> **Acceptance Auditor = 無 AC-blocking 違規**（閘門獨立重跑綠、未捏造
+> fixture、單一邊界確認、`output_config.format` 經查為 SDK 0.96.0 合法欄）。
+
+- [x] [Patch][High] 非 retryable 4xx 原本逐 step continue → 燒光同模型剩餘嘗試。修：non-retryable → 跳到下一個**模型**；401/403（同 key 全模型必敗）→ 立即中止整鏈友善失敗。
+- [x] [Patch][Med] `degraded` 旗標：primary 模型 transient 重試後成功也被標 degraded。修：`degraded = model !== DEGRADATION_MODELS[0]`（僅退到非主模型才算降級）。
+- [x] [Patch][High] parseWorker batch>1 中途 `return` 會丟棄其餘 job。修：不中途 return，全迴圈處理後回 output（pg-boss 預設 batch 1，未來 batch>1 亦不丟）。
+- [x] [Patch][High/NFR-R2] 成功路徑 `markJobStatus` 未守衛 → DB blip rethrow→pg-boss 重跑整段 Claude / job 卡非終態。修：成功終態寫入 try/catch，失敗→best-effort markJobFailed，handler 永不 rethrow（不雙重 parse、必達終態）。
+- [x] [Patch][Med] visionAdapter 入口未驗 images/mimeTypes 長度一致、≤MAX_PARSE_PAGES、非空 → 浪費付費呼叫。修：入口驗證，不合即友善失敗零呼叫。
+- [x] [Patch][Med] `computeCostUsd` `||0` 保留負值（負成本）。修：`tok()` 夾擠 negative/NaN→0（+test）。
+- [x] [Patch][Med] `new Anthropic()` 仍可能 throw / 網路錯（無 HTTP status）未重試。修：建構 try/catch 友善、key `.trim()`、no-status（ECONNRESET/timeout）視為 retryable。
+- [x] [Patch][Low] MAX_TOKENS 8000 多頁恐截斷靜默降級。修：→16000（仍 <非串流 timeout 指引）。
+- [x] [Patch][Med] `markJobStatus`/`markJobFailed` 無終態守衛 → pg-boss 重投可復活已完成 job。修：`WHERE status NOT IN (succeeded|failed|degraded)`。
+- [x] [Patch][Low/NFR-S3] parseWorker catch 記整個 error 物件（恐含請求/影像）。修：只記 `e.message`/String(e)。
+- [x] [Patch][Low] stop_reason 僅處理 refusal/max_tokens。修：非 `end_turn` 皆 structural→降級 + 非機密診斷 log（no-text/invalid-json 區分）。
+- [Dismiss×~8]：`output_config` 非真欄（誤報——Auditor 驗證為 SDK 0.96.0 合法欄 + typecheck 綠）；recordCost best-effort（已 documented tradeoff，AC6 正常路徑滿足）；requestId per-row（無 schema 欄、唯一性成立）；regression it.todo no-op（誠實 deferred W-1-4-1，非 fake，Auditor+LLM-Compliance 確認）；RETRYABLE 409/425（功能無害）；mediaType 預設 jpeg（管線只產 jpeg + 入口已驗）；backoff per-model reset（非 bug）；MAX_TOKENS 同模型 6×（已由跳模型/非 end_turn 緩解）。
+- 驗證：typecheck/lint(0)/test(7 files,72 pass+2 todo,0 回歸)/build 全綠；單一 Anthropic 邊界不變；無 raw-error/image-byte log。Status review→done。

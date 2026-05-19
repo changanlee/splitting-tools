@@ -7,10 +7,14 @@
  */
 import { randomUUID } from "node:crypto";
 
-import { eq } from "drizzle-orm";
+import { and, eq, notInArray } from "drizzle-orm";
 
 import { db } from "@/lib/db/client";
 import { parseJobs, sessions } from "@/db/schema";
+
+/** Terminal statuses are FINAL — never overwritten (a pg-boss
+ *  redelivery / double-process must not resurrect a finished job). */
+const TERMINAL: string[] = ["succeeded", "failed", "degraded"];
 
 /**
  * Create a split session. The id IS the linkId. The canonical
@@ -55,7 +59,9 @@ export async function markJobFailed(
   await db
     .update(parseJobs)
     .set({ status: "failed", error: friendlyMessage, updatedAt: new Date() })
-    .where(eq(parseJobs.id, jobId));
+    .where(
+      and(eq(parseJobs.id, jobId), notInArray(parseJobs.status, TERMINAL)),
+    );
 }
 
 /**
@@ -75,7 +81,9 @@ export async function markJobStatus(
       ...(friendlyMessage !== undefined ? { error: friendlyMessage } : {}),
       updatedAt: new Date(),
     })
-    .where(eq(parseJobs.id, jobId));
+    .where(
+      and(eq(parseJobs.id, jobId), notInArray(parseJobs.status, TERMINAL)),
+    );
 }
 
 /**
