@@ -312,6 +312,37 @@
   is **resolved by design** (per-page ≤1600px keeps text legible) —
   no separate entry needed.
 
+## Deferred from: code review of story-1.5 (2026-05-20)
+
+- **W-CR-6** — parseWorker total-DB-outage double-fault. Status: OPEN,
+  Priority: P2. If `persistReceiptLines` fails AND the best-effort
+  `markJobFailed` also fails (full DB outage), the job is left
+  non-terminal until pg-boss redelivery. Pre-existing Story 1.4
+  design (W-CR-1 already adjudicated the terminal-write-failure
+  tradeoff: do NOT rethrow → no Claude re-cost). Story 1.5 widened the
+  guarded block (persist now inside it) and added P3 (a post-persist
+  status-write failure no longer flips the job to a permanent wrong
+  "failed"), which narrows exposure. Residual: a sustained total
+  outage self-heals only on redelivery once the DB recovers (persist
+  is now transactional + idempotent). Revisit if NFR-R2 needs a hard
+  bound (e.g. a dead-letter / max-redelivery alarm).
+- **W-CR-7** — receipt_lines FK `ON DELETE no action` vs Story 6.1.
+  Status: OPEN, Priority: owned by 6-1-30day-verifiable-destroy.
+  Deleting a `sessions`/`parse_jobs` row with child `receipt_lines`
+  is blocked unless children are deleted first. This matches the
+  existing schema convention (`parse_jobs`/`llm_costs` → `sessions`
+  are also plain `.references()` = no action) — NOT a 1.5 regression.
+  Story 6.1 owns 30-day verifiable destruction and must define the
+  cascade/ordered-delete (and decide CASCADE vs app-ordered) across
+  all child tables incl. receipt_lines. Carry into Story 6.1 ACs.
+- **W-CR-8** — receipt_lines bulk-insert bind-parameter ceiling.
+  Status: OPEN, Priority: Phase-later (scale-stage, akin to W-1-3-2).
+  `persistReceiptLines` does one bulk `insert().values([...])`; ~14
+  columns × rows hits Postgres' 65535 bind-param limit at ~4680 rows.
+  Not reachable today: input is hard-capped at `MAX_PARSE_PAGES=5`
+  (a Costco receipt is ≪ a few hundred lines). Revisit (chunked
+  inserts) only if the page cap is raised or row counts grow.
+
 ---
 
 ## Resolved

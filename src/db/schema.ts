@@ -25,6 +25,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 /** A split-bill session. Link id generation lands in Story 3.1. */
@@ -151,7 +152,12 @@ export const receiptLines = pgTable(
       .defaultNow(),
   },
   (t) => [
-    index("idx_receipt_lines_job").on(t.parseJobId),
+    // DB-level idempotency backstop: a job's lines are (delete+insert)
+    // rewritten in one transaction (persistReceiptLines); this UNIQUE
+    // also fails loud if a concurrent redelivery ever double-inserts.
+    // Its leading column is parse_job_id, so it doubles as the
+    // by-job lookup index (no separate idx_receipt_lines_job needed).
+    uniqueIndex("uq_receipt_lines_job_line_no").on(t.parseJobId, t.lineNo),
     index("idx_receipt_lines_session").on(t.sessionId),
   ],
 );

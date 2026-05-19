@@ -17,5 +17,5 @@ CREATE TABLE "receipt_lines" (
 --> statement-breakpoint
 ALTER TABLE "receipt_lines" ADD CONSTRAINT "receipt_lines_session_id_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."sessions"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "receipt_lines" ADD CONSTRAINT "receipt_lines_parse_job_id_parse_jobs_id_fk" FOREIGN KEY ("parse_job_id") REFERENCES "public"."parse_jobs"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "idx_receipt_lines_job" ON "receipt_lines" USING btree ("parse_job_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "uq_receipt_lines_job_line_no" ON "receipt_lines" USING btree ("parse_job_id","line_no");--> statement-breakpoint
 CREATE INDEX "idx_receipt_lines_session" ON "receipt_lines" USING btree ("session_id");

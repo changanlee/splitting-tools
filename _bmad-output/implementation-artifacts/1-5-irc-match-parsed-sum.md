@@ -1,6 +1,6 @@
 # Story 1.5: IRC 折扣自動配對母品項與 parsed_sum 計算
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -39,6 +39,18 @@ so that 後續分帳/結算的每行金額正確（FR6；FR50 前置資料基礎
 - [x] **Task 3：持久化 + parseWorker 接線（AC6, AC9）** — `src/features/parsing/server/`：`persistAttributedReceipt(jobId, sessionId, attributed)`（寫 receipt_lines 多列，整數分；冪等：同 job 重入先清再寫或 upsert，避免重複——比照終態守衛精神）；`src/workers/parseWorker.ts` 成功路徑：visionAdapter `parsed` → `attributeIrc` → `persistAttributedReceipt` → parsed_sum（receipt_lines 聚合或既有欄，spec 述選擇）→ markJobStatus succeeded/degraded（既有，不破壞 NFR-R2/終態守衛）。失敗/降級不寫 receipt_lines。`deferred-work#W-1-4-3` RESOLVED。
 - [x] **Task 4：regression carry-forward（AC7）** — 不偽綠：`regression-invariants.test.ts` REAL #5564 `it.todo` 保留 anchor（更新註記指向本 story 已實作演算法、真資料仍 gated W-1-4-1/W-CR-5）；演算法證明在 `irc.test.ts`（合成 #5564 結構 fixture，明標非 OCR 真資料）。
 - [x] **Task 5：驗收自查（AC8, AC9）** — `pnpm typecheck`(0)/`lint`(0)/`test`（既有零回歸 + 新 irc 具名測）/`build`(綠)；`pnpm db:generate` 後 migration diff 僅新增 receipt_lines；靜態掃描：無 visionAdapter 改動/繞過、既有 4 表未改、無新 npm 相依、IRC 不在 route handler；W-1-4-3 標 RESOLVED。
+
+### Review Findings
+
+> Code review 2026-05-20（full 模式，3 hunters：Blind / Edge Case / Acceptance Auditor；LLM-Compliance 自動跳過——1.5 非 Claude 邊界）。Acceptance Auditor：9 AC 全 SATISFIED、honesty 鐵則全守（無偽綠、無捏造 #5564）。下列為 Blind/Edge 對 glue 層（persist/parseWorker）的可修韌性問題；演算法層（irc.ts）與 spec 符合，多數「誤判」其實是 spec 明定的 orphan→Epic 2 安全網或 1.6 結構拒範疇。
+
+- [x] [Review][Patch] persistReceiptLines delete+insert 包進單一交易（crash/insert 失敗 → rollback，舊列不遺失；真正冪等）[src/features/parsing/server/persistReceiptLines.ts]
+- [x] [Review][Patch] persistReceiptLines：dangling 母行 id fail-loud（非孤兒卻查無母 lineNo → throw，不再 `?? null` 靜默寫 null；符合專案 fail-loud 慣例）[src/features/parsing/server/persistReceiptLines.ts]
+- [x] [Review][Patch] parseWorker：`persisted` flag — persist 成功但 markJobStatus 失敗時**不**呼叫 markJobFailed（否則終態守衛令 job 永久錯誤「failed」而 receipt_lines 已正確寫入卻隱藏）；只有 attribute/persist 失敗（無列）才標 failed，留非終態待 redelivery 自癒。註：未加每 job 終態 pre-check（會對每筆 job 多一次 SELECT 查詢）；P1 交易已令罕見 crash-redelivery 的重刪+重插原子且冪等，無資料遺失窗——pre-check 為對已安全的罕見路徑過度工程化，刻意不做 [src/workers/parseWorker.ts]
+- [x] [Review][Patch] receipt_lines 加 `unique(parse_job_id, line_no)` 真正 DB 層冪等（表為本 story 全新、從未部署＝重生 0001 migration 仍純 additive）[src/db/schema.ts, drizzle/migrations/0001_*.sql]
+- [x] [Review][Defer] 全 DB 斷線雙重故障（persist 失敗且 markJobFailed 亦失敗 → job 卡 processing）[src/workers/parseWorker.ts] — deferred, pre-existing（1.4 設計 / W-CR-1 已審；1.5 P3 縮小暴露面，殘留 total-outage 為 1.4 既受 NFR-R2 取捨）
+- [x] [Review][Defer] FK `ON DELETE no action` 與 Story 6.1 30 天可驗證銷毀的刪除語意 [drizzle/migrations/0001_*.sql] — deferred, pre-existing（既有 parse_jobs/llm_costs 同慣例；6-1-30day-verifiable-destroy 為刪除語意 owner）
+- [x] [Review][Defer] 單批 insert 逼近 Postgres 65535 bind-param 上限（~4680 列）[src/features/parsing/server/persistReceiptLines.ts] — deferred, phase-later（現由 MAX_PARSE_PAGES=5 上限約束，遠低於上限；同 W-1-3-2 scale-stage 範疇）
 
 ## Dev Notes
 
@@ -135,14 +147,20 @@ claude-opus-4-7[1m]
 ### Change Log
 
 - 2026-05-20 — Story 1.5 dev-story 完成（Task 0-5）。新增純 IRC 演算法 + receipt_lines schema/migration + parseWorker 成功路徑接線；W-1-4-3 RESOLVED。閘門全綠（typecheck/lint/test 82pass2todo/build）。Status → review。
+- 2026-05-20 — Code review（full，3 hunters）完成。套用 4 review patch（P1 persist 交易原子化、P2 dangling 母行 fail-loud、P3 parseWorker persisted-flag、P4 receipt_lines UNIQUE(parse_job_id,line_no) + 重生 0001 migration）；3 defer 登記（W-CR-6/7/8）；閘門重跑全綠。Status → done。
 
 ### File List
 
 - NEW `src/features/parsing/irc.ts` — 純 IRC 配對 + parsed_sum 演算法
 - NEW `src/features/parsing/irc.test.ts` — node 具名測（含明標 synthetic #5564 結構契約）
 - NEW `src/features/parsing/server/persistReceiptLines.ts` — receipt_lines 冪等寫入膠合
-- NEW `drizzle/migrations/0001_gifted_night_thrasher.sql` — additive CREATE TABLE receipt_lines
+- NEW `drizzle/migrations/0001_cooing_korath.sql` — additive CREATE TABLE receipt_lines（含 review P4 的 `uq_receipt_lines_job_line_no` UNIQUE；取代未部署的舊 0001_gifted_night_thrasher，重生為單一乾淨 additive migration）
 - NEW `drizzle/migrations/meta/0001_snapshot.json` + `meta/_journal.json` 更新（drizzle-kit generate 產出）
-- MODIFIED `src/db/schema.ts` — +receiptLines pgTable（既有 4 表零改）
-- MODIFIED `src/workers/parseWorker.ts` — 成功路徑接 attributeIrc + persistReceiptLines（同 try/catch，NFR-R2 保留）
+- MODIFIED `src/db/schema.ts` — +receiptLines pgTable（既有 4 表零改）；review P4：+uniqueIndex(parseJobId,lineNo) 取代 idx_receipt_lines_job（leading col 即 parse_job_id，by-job 查詢仍走此 index）
+- MODIFIED `src/workers/parseWorker.ts` — 成功路徑接 attributeIrc + persistReceiptLines（同 try/catch，NFR-R2 保留）；review P3：persisted flag，persist 成功後狀態寫入失敗不再標永久 failed
+- MODIFIED `src/features/parsing/server/persistReceiptLines.ts` — review P1（delete+insert 包單一交易，原子+冪等）+ P2（dangling 母行 id fail-loud throw，不再靜默 `?? null`）
 - MODIFIED `src/features/parsing/__tests__/regression-invariants.test.ts` — it.todo anchor 註記更新（不偽綠）
+
+### Review Outcome
+
+Code review 2026-05-20（full，3 hunters）：Acceptance Auditor 判 9 AC 全 SATISFIED、honesty 鐵則全守。4 patch 全數套用並驗證（typecheck 0 / lint 0 / test 82 pass 2 todo / build 5 routes 全綠）；3 defer 登記 deferred-work（W-CR-6/7/8）；11 dismiss（多為 spec 明定 orphan→Epic 2 安全網或 1.6 結構拒範疇，非缺陷）。無 decision-needed、無未解 HIGH/MED → Status: done。

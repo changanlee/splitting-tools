@@ -56,12 +56,13 @@ export async function registerParseWorker(boss: PgBoss): Promise<void> {
             { sessionId: data.sessionId, jobId: data.jobId },
           );
           if (outcome.kind === "parsed") {
+            output = outcome.receipt; // pg-boss job output (W-1-4-3)
             // Story 1.5: IRC attribution + receipt_lines persistence in
             // the SAME success path (W-1-4-3 hand-off; no cross-process
-            // pg-boss-output read). Guard the WHOLE terminal block: a
-            // DB blip must NOT rethrow (pg-boss would re-run the whole
-            // Claude parse — explicitly avoided) and must still leave a
-            // terminal state (NFR-R2 — payer never deadlocked).
+            // pg-boss-output read). A DB blip must NOT rethrow (pg-boss
+            // would re-run the whole Claude parse — explicitly avoided)
+            // and must still leave the payer un-deadlocked (NFR-R2).
+            let persisted = false;
             try {
               const attributed = attributeIrc(outcome.receipt);
               await persistReceiptLines(
@@ -69,6 +70,7 @@ export async function registerParseWorker(boss: PgBoss): Promise<void> {
                 data.sessionId,
                 attributed,
               );
+              persisted = true;
               await markJobStatus(
                 data.jobId,
                 outcome.degraded ? "degraded" : "succeeded",
@@ -78,11 +80,20 @@ export async function registerParseWorker(boss: PgBoss): Promise<void> {
                 "[parseWorker] IRC persist / terminal write failed:",
                 e instanceof Error ? e.message : String(e),
               );
-              await markJobFailed(data.jobId, FRIENDLY_UNEXPECTED).catch(
-                () => {},
-              );
+              // If receipt_lines were already written, do NOT mark the
+              // job failed: markJobFailed's terminal guard would turn a
+              // transient status-write blip into a PERMANENT wrong
+              // "failed" that hides the correct rows. Leave it
+              // non-terminal — pg-boss redelivery re-runs the
+              // (transactional, idempotent) persist + status write and
+              // self-heals once the DB recovers. Only an attribution /
+              // persist failure (no rows) marks failed (best-effort).
+              if (!persisted) {
+                await markJobFailed(data.jobId, FRIENDLY_UNEXPECTED).catch(
+                  () => {},
+                );
+              }
             }
-            output = outcome.receipt; // pg-boss job output (W-1-4-3)
           } else {
             // Friendly terminal failure (visionAdapter exhausted its
             // chain). Resolve — never throw (no pg-boss double retry).

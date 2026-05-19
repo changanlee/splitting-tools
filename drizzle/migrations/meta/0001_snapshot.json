@@ -1,5 +1,5 @@
 {
-  "id": "16387dd4-fab2-4e6d-9247-36fce4600fc1",
+  "id": "5ea89474-fa42-4231-aa31-3c0b51af9d1e",
   "prevId": "de40febe-415d-4553-bc08-5ce21bc50c09",
   "version": "7",
   "dialect": "postgresql",
@@ -326,17 +326,23 @@
         }
       },
       "indexes": {
-        "idx_receipt_lines_job": {
-          "name": "idx_receipt_lines_job",
+        "uq_receipt_lines_job_line_no": {
+          "name": "uq_receipt_lines_job_line_no",
           "columns": [
             {
               "expression": "parse_job_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
+            },
+            {
+              "expression": "line_no",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
             }
           ],
-          "isUnique": false,
+          "isUnique": true,
           "concurrently": false,
           "method": "btree",
           "with": {}
