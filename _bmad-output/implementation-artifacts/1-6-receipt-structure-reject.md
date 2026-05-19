@@ -1,6 +1,6 @@
 # Story 1.6: 非 #5564 結構收據明確拒絕（FR7 v1 硬鎖）
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -113,6 +113,17 @@ claude-opus-4-7[1m]
 ### Change Log
 
 - 2026-05-20 — Story 1.6 dev-story 完成（Task 0-5）。新增純結構分類器（fail-closed FR7）+ 友善訊息常數 + parseWorker 拒絕閘門（正常分支非 throw）；母碼 regex 單一真實來源（irc.ts 匯出）。零 migration / 零新 npm / visionAdapter 零改動。閘門全綠（typecheck/lint/test 93pass2todo/build）。Status → review。
+- 2026-05-20 — Code review（full，3 hunters）完成。收斂 CRITICAL：原 `hasParentCode`＝任一 `\d{3,}` 是 fail-OPEN（常見台灣本土非 #5564 收據會通過）。套用 3 review patch（P1 強化正向確認＝code+qty×price 形狀 `FIVE5564_LINE_TAIL_RE`、P2 拒絕路徑不回傳被拒收據為 pg-boss output、P3 補 false-ACCEPT 對抗測試 +3 案，all-negative 期望精化為 `no_recognizable_product_code`）；2 defer 登記（W-CR-9 啟發式精準度 gated W-1-4-1、W-CR-6 擴展涵蓋本 story 結構拒絕路徑同類殘留）；honesty 鐵則全守（regression anchor 零改、synthetic 明標）。閘門重跑全綠（typecheck/lint/test **96pass 2todo**/build）。Status → done。
+
+### Review Findings
+
+> Code review 2026-05-20（full，3 hunters：Blind / Edge Case / Acceptance Auditor；LLM-Compliance 自動跳過——1.6 非 Claude 邊界）。**收斂 CRITICAL**（Blind#10 / Edge#1 / Auditor）：`hasParentCode`＝「任一 `\d{3,}` 數字串」是 fail-**OPEN** 正向訊號——常見台灣本土非 #5564 收據（含稅、NT$、有日期/單號數字）會通過閘門 → 正是 FR7 要防的靜默誤算。AC2-AC6/AC8 與 honesty 鐵則（anchor 未改、synthetic 明標、零 migration/npm/visionAdapter）SATISFIED。
+
+- [x] [Review][Patch] **（CRITICAL）強化 #5564 正向確認**：正向訊號由「任一 `\d{3,}`」改為「至少一行符合 #5564 品項行形狀」＝母碼（沿用 1.5 `PARENT_CODE_RE` 單一真實來源）**且** `數量x 小數價` 尾樣式（`FIVE5564_LINE_TAIL_RE`）。常見本土非 #5564 收據（無母碼+qty+price 形狀）→ 正確 reject `no_recognizable_product_code`（真 fail-closed，AC1/FR7）[src/features/parsing/structureGuard.ts]
+- [x] [Review][Patch] parseWorker：`output = outcome.receipt` 只在結構**通過**後設定（拒絕路徑不把被拒收據當 pg-boss job output 回傳，避免 output 通道與 parse_jobs 終態矛盾）[src/workers/parseWorker.ts]
+- [x] [Review][Patch] 補 false-ACCEPT 對抗測試：真實感非 #5564 本土收據（日期/單號數字、無稅/外幣、正額）→ 必 `ok:false`（修前 RED 證 bug、修後 GREEN）；並更新 all-negative 測例期望（無 #5564 形狀行 → `no_recognizable_product_code`，較原 `structural_inconsistency` 更精確且符 AC2 優先序 no_code>structural）[src/features/parsing/structureGuard.test.ts]
+- [x] [Review][Defer] structure-guard tax/currency 啟發式精準度（TAX_RE 子字串命中如 `tax-free`/產品名含`稅額`/真 #5564 footer 營業稅 誤拒；FOREIGN bare-symbol-anywhere & `USD12` 邊界漏判）[src/features/parsing/structureGuard.ts] — deferred（→ W-CR-9；本質需真 #5564 OCR 調校，gated W-1-4-1；spec Debug Log 已載明 fail-closed 取捨；不臆測）
+- [x] [Review][Defer] 結構拒絕路徑 markJobFailed 雙重故障（DB blip → job 卡 processing）[src/workers/parseWorker.ts] — deferred（→ 併入既有 W-CR-6；與 1.4 exhausted-chain `else` / 1.5 同一已受 best-effort 模式，非 1.6 獨有；total-outage 殘留為既受 NFR-R2 取捨）
 
 ### File List
 
@@ -120,4 +131,8 @@ claude-opus-4-7[1m]
 - NEW `src/features/parsing/structureGuard.test.ts` — node 具名測（含明標 synthetic #5564 fixture）
 - MODIFIED `src/features/parsing/irc.ts` — `PARENT_CODE_RE` 改為 `export`（僅新增匯出，IRC 演算法零改動；母碼單一真實來源）
 - MODIFIED `src/features/parsing/schema.ts` — +`STRUCTURE_REJECT_MESSAGE` 具名常數（無表/schema 結構改動）
-- MODIFIED `src/workers/parseWorker.ts` — 成功路徑插結構拒絕閘門（正常分支 `continue`，1.5 try/persisted-flag/終態守衛不破壞）
+- MODIFIED `src/workers/parseWorker.ts` — 成功路徑插結構拒絕閘門（正常分支 `continue`，1.5 try/persisted-flag/終態守衛不破壞）；review P2：`output=outcome.receipt` 改至結構通過後才設
+
+### Review Outcome
+
+Code review 2026-05-20（full，3 hunters）：3 patch 全套用並驗證、2 defer（W-CR-9、W-CR-6 擴展）登記、~8 dismiss（spec-conformant 或測試已涵蓋）。0 decision-needed、0 未解 HIGH/MED。閘門重跑：typecheck 0 / lint 0 / **test 96 passed | 2 todo**（既有 82 零回歸 + 1.5 新 11 零回歸 + 1.6 新 14；regression anchor 仍 it.todo 未改）/ build 5 routes 全綠。Status → done。

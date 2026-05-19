@@ -51,6 +51,17 @@ const TAX_RE =
 const FOREIGN_CURRENCY_RE =
   /(?:\bUSD\b|US\$|\bJPY\b|\bEUR\b|\bGBP\b|\bCNY\b|\bRMB\b|\bHKD\b|HK\$|\bKRW\b|[¥€£₩])/i;
 
+/**
+ * #5564 product-LINE tail: `<qty>x <price.dd>` (price may carry a short
+ * leading currency token, e.g. `NT$`/`TWD`). This is the discriminator
+ * that makes positive #5564 confirmation real: a bare `\d{3,}` run is
+ * NOT enough — a date / phone / order-no / loyalty-no satisfies that
+ * and would fail OPEN (a common non-#5564 domestic receipt slipping
+ * through = the exact FR7 silent-misbill harm). A #5564 product line
+ * is a parent code FOLLOWED BY this qty×price shape.
+ */
+const FIVE5564_LINE_TAIL_RE = /\d+\s*[xX]\s*(?:[A-Za-z$¥€£₩]{0,4}\s*)?\d+\.\d{2}\b/;
+
 /** Same concatenation order as irc.ts so the rules can't drift apart. */
 function searchText(l: ReceiptLine): string {
   return `${l.rawText ?? ""} ${l.description}`;
@@ -64,10 +75,18 @@ function hasForeignCurrency(l: ReceiptLine): boolean {
   return FOREIGN_CURRENCY_RE.test(searchText(l));
 }
 
-function hasParentCode(l: ReceiptLine): boolean {
-  // Single source of truth with Story 1.5's IRC parent-code rule
-  // (PARENT_CODE_RE has no `g` flag → `.test` is stateless / safe).
-  return PARENT_CODE_RE.test(searchText(l));
+/**
+ * A line that positively looks like a #5564 product line: a leading
+ * product code (PARENT_CODE_RE — single source of truth with Story
+ * 1.5's IRC rule; no `g` flag → `.test` is stateless/safe) AND the
+ * #5564 qty×price tail. Requiring BOTH (not just the code token)
+ * keeps the classifier genuinely fail-CLOSED: a receipt with only
+ * incidental numbers (dates / order numbers) has no such line and is
+ * rejected, instead of being silently accepted and mis-split.
+ */
+function isFive5564ProductLine(l: ReceiptLine): boolean {
+  const s = searchText(l);
+  return PARENT_CODE_RE.test(s) && FIVE5564_LINE_TAIL_RE.test(s);
 }
 
 /**
@@ -96,7 +115,7 @@ export function classifyReceiptStructure(
   if (lines.some(hasForeignCurrency)) {
     return { ok: false, reason: "foreign_currency" };
   }
-  if (!lines.some(hasParentCode)) {
+  if (!lines.some(isFive5564ProductLine)) {
     return { ok: false, reason: "no_recognizable_product_code" };
   }
   // A #5564 receipt always has at least one positive product line; an

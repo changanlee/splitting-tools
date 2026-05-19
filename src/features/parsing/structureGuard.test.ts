@@ -73,7 +73,11 @@ describe("disqualifier signals → reject with classified reason (AC2)", () => {
     });
   });
 
-  it("no positive product line (all negative) → structural_inconsistency", () => {
+  it("all-negative, no #5564 product-shape line → no_recognizable_product_code", () => {
+    // Neither line has the code+qty×price #5564 shape, so the stronger
+    // positive-confirmation fails BEFORE the no-positive-amount check.
+    // no_code > structural is the spec precedence and this is the more
+    // precise reason (there genuinely is no recognizable #5564 line).
     const r: ParsedReceipt = {
       lines: [
         line("IRC", -900, "IRC #8511322"),
@@ -82,7 +86,7 @@ describe("disqualifier signals → reject with classified reason (AC2)", () => {
     };
     expect(classifyReceiptStructure(r)).toEqual({
       ok: false,
-      reason: "structural_inconsistency",
+      reason: "no_recognizable_product_code",
     });
   });
 
@@ -135,6 +139,47 @@ describe("multi-page concatenated receipt (AC3 / CIP fold-in)", () => {
       ok: false,
       reason: "independent_tax_line",
     });
+  });
+});
+
+describe("FR7 fail-CLOSED: realistic non-#5564 domestic receipt → reject (review P1)", () => {
+  // The headline FR7 harm: a common Taiwan domestic (NOT Costco #5564)
+  // receipt — tax-INCLUSIVE (no tax keyword), NT$ (no foreign symbol),
+  // positive amounts, but only INCIDENTAL digits (date / order-no /
+  // phone / loyalty-no, never a #5564 code+qty×price product line).
+  // A "any \d{3,} run" positive signal fail-OPENs here (silent
+  // mis-split); the strengthened code+qty×price shape must reject it.
+  it("convenience-store style receipt (date/order digits, no #5564 line) → no_recognizable_product_code", () => {
+    const r: ParsedReceipt = {
+      lines: [
+        line("飲料", 3500, "A0012 飲料 35"),
+        line("便當", 8000, "便當 80 2026-05-20"),
+        line("發票", 0, "電子發票 AB12345678 序號 0009999"),
+      ],
+    };
+    expect(classifyReceiptStructure(r)).toEqual({
+      ok: false,
+      reason: "no_recognizable_product_code",
+    });
+  });
+
+  it("receipt whose only 3+ digit run is a phone/transaction number → reject", () => {
+    const r: ParsedReceipt = {
+      lines: [
+        line("品項一", 1280, "品項一 12.80"),
+        line("謝謝惠顧", 0, "TEL 0223456789 交易序號 1234567"),
+      ],
+    };
+    expect(classifyReceiptStructure(r)).toEqual({
+      ok: false,
+      reason: "no_recognizable_product_code",
+    });
+  });
+
+  it("genuine #5564 product-shape line (code + qty×price) still accepts", () => {
+    // Guard the patch didn't over-tighten: the SYNTHETIC #5564 shape
+    // (NOT OCR data) must remain ok:true.
+    expect(classifyReceiptStructure(synthetic5564())).toEqual({ ok: true });
   });
 });
 

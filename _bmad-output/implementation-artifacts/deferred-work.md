@@ -343,6 +343,36 @@
   (a Costco receipt is ≪ a few hundred lines). Revisit (chunked
   inserts) only if the page cap is raised or row counts grow.
 
+## Deferred from: code review of story-1.6 (2026-05-20)
+
+- **W-CR-9** — structureGuard tax/currency heuristic precision.
+  Status: OPEN, Priority: P2 (gated by W-1-4-1). `TAX_RE` matches a
+  tax substring *anywhere* in `rawText+description`: `tax-free`
+  (hyphen is a `\b`), a product name containing `稅額`, or — most
+  importantly — the real #5564 footer if Story 1.4 emits it as a line
+  carrying `營業稅`/`稅額` (both matched) would FALSE-REJECT the very
+  receipt v1 must accept (AC1). `FOREIGN_CURRENCY_RE` matches a bare
+  `[¥€£₩]` anywhere (decorative glyph in a product name → false
+  reject) and misses glued tokens like `USD12` (`\bUSD\b` boundary →
+  false negative). These are precision-tuning concerns on a heuristic
+  that *fundamentally cannot be validated without real #5564 OCR*
+  (gated W-1-4-1; W-CR-5 multi-page n=0). The spec's Debug Log already
+  records the deliberate fail-closed tradeoff (bare single `稅`/`税`
+  excluded on purpose); fail-closed conservative false-reject is the
+  explicit FR7 stance. Do NOT guess-tune without real data. Revisit
+  with W-1-4-1 (live parse) to confirm which footer/lines 1.4 actually
+  emits, then tighten anchoring (line-dominated-by-tax-term, currency
+  adjacent to a numeric amount).
+- **W-CR-6 (extended 2026-05-20, story-1.6)** — the Story 1.6
+  structure-reject path (`markJobFailed(STRUCTURE_REJECT_MESSAGE)
+  .catch(log); continue;`) is another instance of the same accepted
+  best-effort double-fault residual: if that `markJobFailed` fails on
+  a DB blip the job stays non-terminal until pg-boss redelivery. Same
+  pattern as the 1.4 visionAdapter-exhausted `else` branch and 1.5;
+  NOT 1.6-specific. Covered by the existing W-CR-6 tradeoff (no
+  rethrow → no Claude re-cost; self-heals on redelivery). No separate
+  entry — tracked here under W-CR-6.
+
 ---
 
 ## Resolved

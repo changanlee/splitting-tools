@@ -58,15 +58,17 @@ export async function registerParseWorker(boss: PgBoss): Promise<void> {
             { sessionId: data.sessionId, jobId: data.jobId },
           );
           if (outcome.kind === "parsed") {
-            output = outcome.receipt; // pg-boss job output (W-1-4-3)
             // Story 1.6 (FR7 v1 hard-lock): structure gate BEFORE any
-            // IRC/persist. A non-#5564 structure is rejected with the
-            // single friendly message (NFR-R1 — the internal reason is
-            // server-log only) and writes NO receipt_lines, so the
-            // payer is never silently mis-billed. This is a NORMAL
-            // control-flow branch (not a throw): it goes through
-            // markJobFailed like the visionAdapter-exhausted path and
-            // must not fall into the unexpected-error catch.
+            // IRC/persist AND before `output` is set. A non-#5564
+            // structure is rejected with the single friendly message
+            // (NFR-R1 — the internal reason is server-log only),
+            // writes NO receipt_lines, and is NOT returned as the
+            // pg-boss job output (a rejected receipt must not look
+            // like a successful parse on the output channel; the
+            // authoritative state is the `failed` parse_jobs row).
+            // This is a NORMAL control-flow branch (not a throw): it
+            // goes through markJobFailed like the visionAdapter-
+            // exhausted path and must not fall into the catch.
             const structure = classifyReceiptStructure(outcome.receipt);
             if (!structure.ok) {
               console.error(
@@ -84,6 +86,7 @@ export async function registerParseWorker(boss: PgBoss): Promise<void> {
               );
               continue;
             }
+            output = outcome.receipt; // pg-boss job output (W-1-4-3)
             // Story 1.5: IRC attribution + receipt_lines persistence in
             // the SAME success path (W-1-4-3 hand-off; no cross-process
             // pg-boss-output read). A DB blip must NOT rethrow (pg-boss
