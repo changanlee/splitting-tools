@@ -121,6 +121,33 @@
 
 ---
 
+## Deferred from: CIP — multi-page receipt (2026-05-19)
+
+> Source: `docs/PRD-multi-page-receipt-roadmap.md`. Multi-page pulled
+> into v1, Epic 1 re-sequenced (new Story 1-2b). These are tracked
+> risks the re-sequence created.
+
+### W-CR-5 — multi-page parse accuracy is n=0; regression testdata gap
+
+- **Status:** OPEN
+- **Priority:** P1
+- **Story:** owned by 1-4-vision-llm-parse / 1-5-irc-match-parsed-sum
+- **Gap:** single-image feasibility was n=1 (#5564). Multi-page parse
+  (N images → one logical receipt, `parsed_sum` across pages) is
+  **n=0** — completely unvalidated. `epics.md:349` already wants a
+  超長/折疊 regression variant; it must become a *real multi-page*
+  fixture, not a single tall image.
+- **Reason for defer:** real fixtures land with the LLM stories;
+  cannot validate before 1-2b/1.4 exist.
+- **Trigger / resolve when:** Story 1.4/1.5 — add a multi-page #5564
+  (or equivalent) fixture; assert `parsed_sum == Σ pages − IRC`
+  holds; close here.
+- **Note:** the single-long-image 1600px-compression resolution risk
+  is **resolved by design** (per-page ≤1600px keeps text legible) —
+  no separate entry needed.
+
+---
+
 ## Resolved
 
 _(none yet — entries move here with a `RESOLVED (date, by story/commit)`
