@@ -1,6 +1,6 @@
 # Story 1.4: 單次視覺 LLM 解析與縮寫品名還原（LLM-Ops 包裹）
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -35,14 +35,14 @@ so that 我不必逐行手打帳（FR4、FR5；NFR-L1–L5、NFR-R1）。
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0：前置 + claude-api skill（鐵則 2）** — 確認 1.3 done（producer/queue/contract 在）；**invoke `claude-api` skill** 取最新 Anthropic SDK 版本/用法/prompt caching/vision multi-image/結構化輸出最佳實務 + 模型 ID 確認；讀 Next/worker 既有 `src/workers/index.ts`（G2）。供應鏈：`pnpm view @anthropic-ai/sdk version` + minimumReleaseAge（必要時 pin 較舊安全版，比照 1.3 TanStack）。
-- [ ] **Task 1：Zod `ReceiptLineSchema`（純，node 測）（AC3, AC11）** — `src/features/parsing/schema.ts` 加 `ReceiptLineSchema`（`description/rawText?/qty/amountCents` 整數分）+ `ParsedReceiptSchema`（lines[] + 可選 meta）+ `z.infer` 型別；純解析/驗證測試（合法、缺欄、float 金額拒、空、非法 qty）。
-- [ ] **Task 2：成本/退避純邏輯（AC4, AC6, AC11）** — `src/lib/llm/cost.ts`：`computeCostUsd(model,promptTokens,completionTokens)` 純（單價表常數，numeric 10,6 對齊）；`src/lib/llm/retry.ts`：退避+jitter 排程純函式（≥3、上限）+ `selectDegradation(attemptState)` 降級選擇器純函式。皆 co-located node 測。
-- [ ] **Task 3：`visionAdapter` 本體（唯一邊界）（AC1, AC2, AC3, AC4, AC5, AC6）** — 實作 `src/lib/llm/visionAdapter.ts`（取代 NotImplemented stub）：`parseReceiptImages(images,mimeTypes,ctx)` → 組單次多圖 messages（prompt caching）→ 呼叫 `@anthropic-ai/sdk`（primary sonnet）→ Zod 驗證 → 失敗走 retry(Task2)→降級(Task2: haiku→cache→static→friendly) → **每次嘗試**寫 `llm_costs`（Task2 cost） → 回 `ParsedReceipt` 或降級結果；原始錯誤永不外洩（friendly only）。簽章在此 story 定義（1.1 stub 刻意留白）。
-- [ ] **Task 4：`parseWorker` 消費者（AC1, AC7, AC8）** — `src/workers/parseWorker.ts`：`boss.work("parse", handler)`；handler 取 payload→`visionAdapter.parseReceiptImages`→寫回 `parse_jobs`（succeeded/degraded/failed + 結果持久化策略，不新增表）；`src/workers/index.ts` 在 pg-boss start 後 register（G2 順序不變）。**W-CR-1**（pg-boss liveness/健康）trigger 在此：consumer 加上後補 liveness/非零退出於致命 queue error（關閉 W-CR-1）。
-- [ ] **Task 5：#5564 真 fixture + 回歸接線（AC9, AC11）** — 以真 #5564（28 行含 3 IRC，gross 加總）取代 placeholder；回填 `regression-invariants.test.ts` 之 REAL #5564 `it.todo`（保留 id，不重建 harness）；雙不變量綠；多頁 n=0 與真 Claude 準確率＝`W-CR-5`/`W-1-4-1`（不謊報）。
-- [ ] **Task 6：LLM Compliance 落實（AC10）** — 本檔 `## LLM Compliance` 表逐項；code 對應：items1/2/4/5 on-spec 證據（檔:行）、item3 加「verify 1.3 async wiring 仍成立」一個 task 不重實作、item7 指向 1.7 sem（沿用 `checkParseBudget`，不 enforce）。
-- [ ] **Task 7：驗收自查（AC11）** — `pnpm typecheck`(0)/`lint`(0)/`test`（既有零回歸 + 新 node 測）/`build`（綠）；靜態掃描：**唯一** Anthropic 呼叫點＝`visionAdapter`（無其他）、原始錯誤零外洩、影像位元組零 log、`src/db/schema.ts` 表未改、G2 order 未動；無 key 時 build/test 不被阻（adapter 對缺 key 走友善降級，不 crash 進程）；`W-1-4-1`（真 Claude runtime 驗證）/相依供應鏈紀錄。
+- [x] **Task 0**：claude-api skill 已 invoke（SDK 用法/prompt caching/vision 多圖/`output_config.format` 結構化輸出/usage cost/typed error 分類/模型 ID 確認）；供應鏈：`@anthropic-ai/sdk@0.97.x` <24h 被擋 → pin **0.96.0**（2026-05-13，安全），host frozen-lockfile exit 0。
+- [x] **Task 1**（AC3,AC11）：`schema.ts` 加 `ReceiptLineSchema`（description/rawText?/qty 正整數/amountCents 整數分，負額=IRC 行）+`ParsedReceiptSchema`+`PARSED_RECEIPT_JSON_SCHEMA`（手寫，避免 SDK↔zod 版本耦合）+ `z.infer`；schema.test.ts +具名測（合法/負額/float 拒/空/缺欄）。
+- [x] **Task 2**（AC4,AC6,AC11）：`models.ts`（PRIMARY sonnet-4-6 / FALLBACK haiku-4-5-20251001）、`cost.ts`（`computeCostUsd` 純，含 cache write 1.25×/read 0.1×、unknown→0、numeric10,6 rounding）、`retry.ts`（`isRetryableStatus` 429/5xx/529、`backoffWithJitterMs` full-jitter rng 注入、`buildAttemptPlan` sonnet×3→haiku×3）+ cost.test/retry.test 具名 node 測。
+- [x] **Task 3**（AC1-6）：`visionAdapter.ts` 取代 NotImplemented stub——單一 Anthropic import 點；單次多圖 messages.create（system 指令塊 `cache_control:ephemeral`、`output_config.format`=JSON schema）→ JSON.parse → `ParsedReceiptSchema` 驗證；plan 迭代 sonnet×3→haiku×3，retryable(429/5xx)→jitter backoff、4xx/結構錯→降級；**每次嘗試**寫 `llm_costs`（model/tokens/latency/cost/requestId/success）；refusal/max_tokens→降級；原始錯誤零外洩（friendly）；**無 key→友善降級不 crash**（→W-1-4-1）；cache/last-good tier 未實作（→W-1-4-2，非 silent）。
+- [x] **Task 4**（AC1,AC7,AC8）：`parseWorker.ts` `boss.work("parse",…)`→`visionAdapter`→`markJobStatus`/`markJobFailed`（succeeded/degraded/failed，friendly only；ParsedReceipt 回傳＝pg-boss job output＝1.4→1.5 hand-off，無新表→W-1-4-3）；handler resolve 不 throw（visionAdapter 已 own retry，避免 pg-boss 雙重 retry）；`index.ts` G2 序 waitDB→migrate→boss.start→**registerParseWorker** 不變；**W-CR-1** 關閉：post-start pg-boss error→log+`process.exit(1)`（orchestrator 重啟，非靜默假健康）。
+- [x] **Task 5**（AC9,AC11）：誠實處理——無真 #5564 ground truth + 無 ANTHROPIC_API_KEY，**不捏造** 28 行 fixture（會成 W-CR-4 tautology / 違「不謊報」）；regression `it.todo` 保留為 anchor，僅更新註記指向 `W-1-4-1`（真 runtime）/`W-CR-5`（多頁 n=0）；placeholder 雙不變量 harness 不動、續綠。
+- [x] **Task 6**（AC10）：LLM Compliance 表（本檔）逐項對齊 code：1/2/4/5 ✅on-spec（visionAdapter retry/cost/log/degrade，檔:行）；3 ⏸inherited（parseWorker 用 1.3 `PARSE_QUEUE`/`ParseJobPayload` 契約＝async wiring 仍成立，未重實作）；6 N/A；7 ⏸1.7（visionAdapter 不 enforce budget，1.3 `checkParseBudget` seam 未動）。
+- [x] **Task 7**（AC11）：`pnpm typecheck`(0)/`lint`(0)/`test`(7 files,71 pass+2 todo,0 回歸)/`build`(綠) 全綠；靜態掃描：唯一 Anthropic import＝`visionAdapter.ts`、零 raw-error/image-byte log、`src/db/schema.ts` 未改、G2 序未動、僅 +`@anthropic-ai/sdk@0.96.0`（供應鏈已查）；無 key build/test 不阻（adapter 友善降級不 crash）。真 Claude runtime → `W-1-4-1`。
 
 ## Dev Notes
 
@@ -116,12 +116,37 @@ so that 我不必逐行手打帳（FR4、FR5；NFR-L1–L5、NFR-R1）。
 
 ### Agent Model Used
 
-（dev-story 時填入）
+claude-opus-4-7[1m]（dev-story，2026-05-20）
 
 ### Debug Log References
 
+- `claude-api` skill：單次多圖＝一則 user message 內 N 個 base64 image block + text；prompt caching＝system 陣列塊加 `cache_control:{type:"ephemeral"}`（注意 Sonnet 4.6 最小可快取前綴 2048 tok，短指令可能不快取，無害）；結構化輸出＝`output_config:{format:{type:"json_schema",schema}}`（prefill 在 4.6 是 400，棄用）；usage 含 `cache_creation/read_input_tokens`（SDK 型別為 `number|null` → recordCost 參數改 `number|null` + `?? undefined` 餵 computeCostUsd）；typed error `Anthropic.APIError.status` 分類；模型 ID 不加日期後綴（haiku 用文件全 ID `claude-haiku-4-5-20251001`，sonnet alias `claude-sonnet-4-6`）。
+- 供應鏈：`@anthropic-ai/sdk@0.97.1` 發布 2026-05-19T15:42Z（<24h，會被 minimumReleaseAge 擋）→ pin **0.96.0**（2026-05-13，~6.7 天，安全）。
+- 無 `ANTHROPIC_API_KEY`：`new Anthropic()` 缺 key 會 throw → 已在 adapter 先檢查 env，缺則直接友善降級回傳，不建構 client、不 crash worker（真呼叫驗證＝W-1-4-1）。
+
 ### Completion Notes List
+
+- ✅ Tasks 0–7 全綠。Story 1.4 唯一 Claude 視覺邊界 + parseWorker 消費者 + LLM-Ops（retry/log/cost/degrade）落地。
+- 設計決策（documented，非 silent）：①CIP 單次多圖（已採）；②結構化輸出用手寫 JSON schema + 自家 Zod 雙重驗證（避免 SDK↔zod 版本耦合，AC3 防禦縱深）；③1.4→1.5 解析結果 hand-off＝pg-boss job output（handler 回傳 ParsedReceipt），**不新增 app schema 表**（receipt_lines 正式化＝Story 1.5）→ `deferred-work#W-1-4-3`；④cache/last-good 降級層未實作（無 prior-good store）→ `W-1-4-2`；⑤真 Claude runtime + 真 #5564 準確率 → `W-1-4-1`（無 key/無 ground truth，不謊報）。
+- W-CR-1（pg-boss liveness）**RESOLVED**：consumer 落地，post-start error → log + 非零退出。
+- 📋 驗證協定回溯：**AC↔測試映射** — AC3/AC4/AC6 純邏輯（ReceiptLineSchema/cost/retry）→ schema.test/cost.test/retry.test 具名 node 測；AC1/AC2/AC5/AC7/AC8（Claude SDK/pg-boss consumer/DB 整合）＝整合層，依 AC11 不入 node（型別+build+靜態掃描 + W-1-4-1 runtime）；AC9 誠實 deferred（不捏造）；AC10/AC11 靜態掃描+閘門全綠。**LLM Compliance** — 1/2/4/5 ✅on-spec、3 ⏸1.3、6 N/A、7 ⏸1.7。**Deferred** — W-1-4-1（真 runtime，P1）、W-1-4-2（cache tier，Phase-later）、W-1-4-3（1.5 receipt_lines 持久化正式化，P1）。
 
 ### Change Log
 
+- 2026-05-20：Story 1.4 實作。新增 `lib/llm/{models,cost(+test),retry(+test)}`、`workers/parseWorker`；改寫 `lib/llm/visionAdapter`（NotImplemented→實體，唯一邊界）、`features/parsing/schema`(+ReceiptLine/ParsedReceipt/JSON schema+test)、`features/parsing/server/jobs`(+markJobStatus)、`workers/index`(register consumer + W-CR-1 liveness)、regression `it.todo` 註記。+`@anthropic-ai/sdk@0.96.0`（供應鏈已查）。閘門全綠（typecheck/lint/test 71+2/build）。W-CR-1 RESOLVED。Status review。
+
 ### File List
+
+> A=新增 M=改。
+
+- `src/lib/llm/visionAdapter.ts`（M：NotImplemented stub → 實體單一 Claude 邊界 + LLM-Ops）
+- `src/lib/llm/models.ts`（A：模型 ID + 降級序）
+- `src/lib/llm/cost.ts`（A：純 cost 計算）/ `src/lib/llm/cost.test.ts`（A：node 測）
+- `src/lib/llm/retry.ts`（A：純 retry/jitter/plan）/ `src/lib/llm/retry.test.ts`（A：node 測）
+- `src/workers/parseWorker.ts`（A：pg-boss `parse` 消費者）
+- `src/workers/index.ts`（M：register parseWorker + W-CR-1 liveness；G2 序不變）
+- `src/features/parsing/schema.ts`（M：+ReceiptLine/ParsedReceipt/PARSED_RECEIPT_JSON_SCHEMA）/ `schema.test.ts`（M：+具名測）
+- `src/features/parsing/server/jobs.ts`（M：+markJobStatus）
+- `src/features/parsing/__tests__/regression-invariants.test.ts`（M：REAL #5564 it.todo 註記，anchor 保留）
+- `package.json`（M：+@anthropic-ai/sdk@0.96.0）
+- `_bmad-output/implementation-artifacts/{1-4-...md,sprint-status.yaml,deferred-work.md}`（M）

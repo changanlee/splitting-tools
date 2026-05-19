@@ -135,3 +135,57 @@ export function isTerminalStatus(status: ParseJobStatus): boolean {
     status === "succeeded" || status === "failed" || status === "degraded"
   );
 }
+
+/* ───────────────────────── Story 1.4 ───────────────────────── */
+
+/**
+ * A single parsed receipt line (Story 1.4, AC3). Money is INTEGER CENTS
+ * — never float (global money guardrail). `description` is the
+ * abbreviation-restored, human-readable name; `rawText` preserves the
+ * original cryptic line for 1.5 IRC attribution / reconciliation
+ * traceability. IRC discount lines are parsed as ordinary negative-
+ * amount lines here — attribution to a parent line is Story 1.5.
+ */
+export const ReceiptLineSchema = z.object({
+  description: z.string().min(1),
+  rawText: z.string().optional(),
+  qty: z.number().int().positive(),
+  amountCents: z.number().int(),
+});
+export type ReceiptLine = z.infer<typeof ReceiptLineSchema>;
+
+/** The full structured parse result the LLM must return (AC3). */
+export const ParsedReceiptSchema = z.object({
+  lines: z.array(ReceiptLineSchema),
+});
+export type ParsedReceipt = z.infer<typeof ParsedReceiptSchema>;
+
+/**
+ * JSON Schema for the Anthropic `output_config.format` constraint.
+ * Hand-written (kept in sync with ReceiptLineSchema) so it stays
+ * independent of any SDK↔zod-version helper coupling. Structured-output
+ * rules: every object needs `additionalProperties: false`; no
+ * min/maxLength. The response is STILL re-validated by
+ * ReceiptLineSchema (defense-in-depth, AC3).
+ */
+export const PARSED_RECEIPT_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    lines: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          description: { type: "string" },
+          rawText: { type: "string" },
+          qty: { type: "integer" },
+          amountCents: { type: "integer" },
+        },
+        required: ["description", "qty", "amountCents"],
+      },
+    },
+  },
+  required: ["lines"],
+} as const;

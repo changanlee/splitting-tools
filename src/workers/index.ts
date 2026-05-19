@@ -26,6 +26,8 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { PgBoss } from "pg-boss";
 import { Pool } from "pg";
 
+import { registerParseWorker } from "@/workers/parseWorker";
+
 const MIGRATIONS_FOLDER = "drizzle/migrations";
 const DB_WAIT_MAX_ATTEMPTS = 30;
 const DB_WAIT_DELAY_MS = 2000;
@@ -83,14 +85,21 @@ async function main(): Promise<void> {
   // 3. ONLY NOW start pg-boss (it self-creates its own schema/tables;
   //    NOT tracked by Drizzle — G2)
   const boss = new PgBoss(connectionString);
-  boss.on("error", (err: unknown) =>
-    console.error("[worker] pg-boss error:", err),
-  );
+  // W-CR-1: a post-start pg-boss error must not leave a silently-dead
+  // worker. Log it and exit non-zero so the orchestrator restarts us
+  // (compose `restart` policy) rather than treating a broken queue as
+  // healthy. (1.4 adds the consumer, so this trigger lands here.)
+  boss.on("error", (err: unknown) => {
+    console.error("[worker] FATAL pg-boss error, exiting:", err);
+    process.exit(1);
+  });
   await boss.start();
   console.log("[worker] pg-boss started (queue ready)");
 
-  // Story 1.1: no job consumers yet. Story 1.3/1.4 register parseWorker
-  // via src/lib/llm/visionAdapter (never bypass it).
+  // Story 1.4: register THE parse consumer (boss.work). All Claude
+  // calls go through src/lib/llm/visionAdapter — never bypassed.
+  await registerParseWorker(boss);
+  console.log("[worker] parseWorker registered (consumer ready)");
 
   let stopping = false;
   const shutdown = async (signal: string) => {

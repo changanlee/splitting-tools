@@ -123,7 +123,11 @@
 
 ### W-CR-1 — pg-boss post-start liveness / health signal
 
-- **Status:** OPEN
+- **Status:** RESOLVED (2026-05-20, by Story 1.4). The parse consumer
+  landed (`parseWorker`); `src/workers/index.ts` `boss.on("error")`
+  now logs and `process.exit(1)` so the orchestrator restarts a
+  broken-queue worker instead of treating it as healthy. Trigger
+  ("Story adds the parse consumer") met and addressed.
 - **Priority:** P1
 - **Story:** owned by 1-3-async-parse-job-polling onward
 - **Gap:** After `boss.start()` a later pg-boss `error` is only logged;
@@ -202,6 +206,60 @@
   — job stays `queued`/in pg-boss until Story 1.4; that is expected.)
 - **Tracked in:** `1-3-async-parse-job-polling.md` Completion Notes.
 
+## W-1-4-1 — Story 1.4 real Claude vision runtime verification
+
+- **Status:** OPEN
+- **Priority:** P1
+- **Story:** 1-4-vision-llm-parse (AC2/AC3/AC5/AC9)
+- **Gap:** no `ANTHROPIC_API_KEY` in the autonomous env, so the actual
+  Claude multi-image call, structured-output parsing, prompt-cache
+  hit, token-usage→cost, retry/degradation on real 429/5xx, and
+  #5564 parse accuracy are NOT runtime-verified. Pure logic
+  (schema/cost/retry) IS node-tested; visionAdapter is type-checked +
+  static-scanned (single boundary, no leak).
+- **Reason for defer:** needs a real API key + a real receipt; can't
+  be done unattended without fabricating (would violate "no lying").
+- **Trigger / resolve when:** with `ANTHROPIC_API_KEY` set, run the
+  worker against a real #5564 image; confirm structured lines parse,
+  `llm_costs` row written with non-zero cost, degradation path on an
+  induced failure, friendly-only `parse_jobs.error`. Record in
+  `1-4-...md` Debug Log; then fill the regression `it.todo`.
+- **Tracked in:** `1-4-vision-llm-parse.md`; relates to W-CR-5.
+
+## W-1-4-2 — Degradation cache / last-good tier
+
+- **Status:** OPEN
+- **Priority:** Phase-later
+- **Story:** parsing reliability (revisit when a prior-good store exists)
+- **Gap:** NFR-R1 names a "cache / last-good" tier between model
+  fallback and the static/friendly message. Not implemented — there
+  is no persisted prior-good parse to fall back to yet. The chain
+  today is sonnet×3 → haiku×3 → friendly (still satisfies retry≥3 +
+  cheaper-model degradation + no raw leak).
+- **Reason for defer:** building a last-good cache now (no store, no
+  reuse key) is premature; the friendly terminal already prevents a
+  deadlock (NFR-R2).
+- **Trigger / resolve when:** if/when parsed receipts are persisted
+  (Story 1.5 receipt_lines), add a last-good lookup before the
+  friendly fallback.
+
+## W-1-4-3 — Formalize 1.4→1.5 parsed-line persistence
+
+- **Status:** OPEN
+- **Priority:** P1
+- **Story:** owned by 1-5-irc-match-parsed-sum
+- **Gap:** Story 1.4 hands the parsed receipt to 1.5 as the **pg-boss
+  job output** (handler return value) — deliberate, since AC6 forbids
+  an app schema-table change in 1.4. Story 1.5 needs IRC attribution
+  over `receipt_lines`; the canonical persistence (a `receipt_lines`
+  table + how 1.5 reads 1.4's output) is 1.5's to formalize.
+- **Reason for defer:** receipt_lines schema is Story 1.5 scope;
+  1.4 must not pre-empt it. Job-output hand-off is the minimal,
+  single-Postgres, no-schema-change bridge.
+- **Trigger / resolve when:** Story 1.5 create-story — define
+  `receipt_lines` (or equivalent) and the read path from 1.4's
+  output; close here.
+
 ## W-1-3-2 — Move parse images out of the pg-boss payload at scale
 
 - **Status:** OPEN
@@ -255,6 +313,9 @@
   blockers fixed (supply-chain window; pnpm fetch-resilience; pnpm10
   onlyBuiltDependencies + packageManager pin) without weakening
   lockfile/policy. Full entry kept above with RESOLVED status.
+- **W-CR-1** — RESOLVED 2026-05-20 (Story 1.4): parse consumer landed;
+  pg-boss post-start error now logs + exits non-zero (orchestrator
+  restarts) instead of a silently-dead worker. Full entry above.
 - **W-1-2-1** — RESOLVED 2026-05-19 (on-device iOS Safari test): Story
   1.2 capture/compress/mask core manual path passed on a real device;
   out-of-bounds-gate & decode-error sub-items honestly reclassified as

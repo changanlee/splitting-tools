@@ -38,8 +38,14 @@ describe("regression invariants (#5564)", () => {
   // --- Carry-forward contract markers: the LIVE assertions land in the
   //     stories named below (real fixture / real settle fn). ---
 
+  // Story 1.4 wired the visionAdapter LLM-Ops boundary + parseWorker,
+  // but the REAL #5564 fixture + parse-accuracy assertion need verified
+  // ground truth AND a live Claude run (no ANTHROPIC_API_KEY here) —
+  // honestly deferred to deferred-work W-1-4-1 (real runtime) and
+  // W-CR-5 (multi-page n=0). NOT fabricated (would be a tautology;
+  // W-CR-4). The 1.5 IRC net (== 2208.50) lands with Story 1.5.
   it.todo(
-    "parsed_sum == 2208.50 against the REAL #5564 fixture — fill in Story 1.4/1.5",
+    "parsed_sum == 2208.50 against the REAL #5564 fixture — Story 1.4/1.5 (gated on W-1-4-1)",
   );
   it.todo(
     "settlement_sum == parsed_sum via src/lib/money/settle.ts — fill in Story 5.1 (FR50)",

@@ -4,8 +4,10 @@ import {
   CreateSessionResponseSchema,
   ErrorEnvelopeSchema,
   MAX_PARSE_PAGES,
+  ParsedReceiptSchema,
   ParseStatusResponseSchema,
   ParseSubmitResponseSchema,
+  ReceiptLineSchema,
   friendlyJobMessage,
   isTerminalStatus,
   validateParseSubmit,
@@ -119,5 +121,52 @@ describe("isTerminalStatus (AC3 stop polling)", () => {
     expect(isTerminalStatus("degraded")).toBe(true);
     expect(isTerminalStatus("queued")).toBe(false);
     expect(isTerminalStatus("processing")).toBe(false);
+  });
+});
+
+describe("ReceiptLineSchema / ParsedReceiptSchema (Story 1.4 AC3)", () => {
+  it("accepts a valid line (rawText optional)", () => {
+    expect(
+      ReceiptLineSchema.parse({
+        description: "清美黑糖紅棗豆漿",
+        rawText: "8517238 1x 16.50",
+        qty: 1,
+        amountCents: 1650,
+      }).amountCents,
+    ).toBe(1650);
+    expect(
+      ReceiptLineSchema.parse({ description: "X", qty: 2, amountCents: 100 })
+        .rawText,
+    ).toBeUndefined();
+  });
+
+  it("accepts a negative amount (IRC discount line — attribution is 1.5)", () => {
+    expect(
+      ReceiptLineSchema.parse({ description: "IRC", qty: 1, amountCents: -900 })
+        .amountCents,
+    ).toBe(-900);
+  });
+
+  it("rejects float cents / zero or negative qty / empty description", () => {
+    expect(() =>
+      ReceiptLineSchema.parse({ description: "X", qty: 1, amountCents: 16.5 }),
+    ).toThrow();
+    expect(() =>
+      ReceiptLineSchema.parse({ description: "X", qty: 0, amountCents: 100 }),
+    ).toThrow();
+    expect(() =>
+      ReceiptLineSchema.parse({ description: "", qty: 1, amountCents: 100 }),
+    ).toThrow();
+  });
+
+  it("ParsedReceiptSchema validates a lines array and rejects a bad line", () => {
+    expect(
+      ParsedReceiptSchema.parse({
+        lines: [{ description: "A", qty: 1, amountCents: 100 }],
+      }).lines.length,
+    ).toBe(1);
+    expect(() =>
+      ParsedReceiptSchema.parse({ lines: [{ description: "A", qty: 1 }] }),
+    ).toThrow();
   });
 });

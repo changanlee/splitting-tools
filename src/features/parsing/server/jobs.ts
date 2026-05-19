@@ -59,6 +59,26 @@ export async function markJobFailed(
 }
 
 /**
+ * Set a job to a non-failed status (processing/succeeded/degraded) —
+ * Story 1.4 parseWorker. `friendlyMessage` only ever holds friendly
+ * copy (NFR-R1); raw errors never reach this column.
+ */
+export async function markJobStatus(
+  jobId: string,
+  status: "processing" | "succeeded" | "degraded",
+  friendlyMessage?: string,
+): Promise<void> {
+  await db
+    .update(parseJobs)
+    .set({
+      status,
+      ...(friendlyMessage !== undefined ? { error: friendlyMessage } : {}),
+      updatedAt: new Date(),
+    })
+    .where(eq(parseJobs.id, jobId));
+}
+
+/**
  * Read a job's status, scoped to its session/link (basic ownership
  * check — full device-token authz is Epic 4). Returns null if the job
  * does not exist OR does not belong to `linkId`. O(1) via the
