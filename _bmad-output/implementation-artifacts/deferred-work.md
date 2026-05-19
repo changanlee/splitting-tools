@@ -23,11 +23,25 @@
   2026-05-18 ~15:54Z, inside the ~24h window). NOT a scaffold defect.
 - **Reason for defer:** External, time-bounded policy; user decision
   2026-05-19 = wait for the window, do not weaken the Dockerfile.
-- **Trigger / resolve when:** env clock ≥ ~2026-05-19 23:54 local (UTC+8;
-  publish+24h). Then run
+- **⚠️ Trigger CORRECTED (2026-05-20 00:03, non-silent):** the original
+  `~23:54` was computed from only the *earliest* flagged package
+  (`@unrs/resolver-binding@1.12.0` ~15:54Z). A retry at 2026-05-20 00:00
+  CST showed the lockfile also contains LATER-published transitives the
+  policy rejects — the binding one (`typescript-eslint@8.59.4`,
+  `@typescript-eslint/*@8.59.4`, `enhanced-resolve@5.21.4`,
+  `baseline-browser-mapping@2.10.31`), latest = **`typescript-eslint@8.59.4`
+  published `2026-05-18T17:43:49Z`** → clears 24h at
+  `2026-05-19T17:43:49Z` = **2026-05-20 ~01:44 CST**. Lockfile is
+  UNCHANGED this session (no deps added); the original estimate simply
+  undercounted. Still NOT a scaffold defect; user decision unchanged
+  (wait the window — do NOT `pnpm clean --lockfile` / relax policy /
+  weaken Dockerfile).
+- **Trigger / resolve when:** env clock ≥ ~2026-05-20 01:44 CST
+  (publish 2026-05-18T17:43:49Z + 24h, +margin). Then run
   `WEB_PORT=3010 DB_PORT=55470 docker compose up -d --build`, verify the 3
-  services (db/web/worker) + web↔db, then push Story 1.1 to review.
-- **Tracked in:** `1-1-project-scaffold-ci.md` Task 9 + Debug Log.
+  services (db/web/worker) + web↔db, then push Story 1.1 to review→done.
+- **Tracked in:** `1-1-project-scaffold-ci.md` Task 9 + Debug Log;
+  `MEMORY.md` (estimate-correction lesson).
 
 ## W-1-2-1 — Story 1.2 manual browser verification (camera/HEIC/drag)
 
