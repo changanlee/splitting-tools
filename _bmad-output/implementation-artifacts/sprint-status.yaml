@@ -1,0 +1,121 @@
+# generated: 2026-05-19
+# last_updated: 2026-05-19T08:35
+# project: splitting_tools
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog -> in-progress: Automatically when first story is created (via create-story)
+#   - in-progress -> done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+#
+# PROJECT-SPECIFIC ORDERING (locked, do NOT invert):
+# ==================================================
+# Epic order follows architecture.md Implementation Sequence:
+#   E1 parse -> E2 reconcile gate -> E3 link -> E4 claim/board -> E5 settle -> E6 lifecycle
+# Story 1-1-project-scaffold-ci MUST be first (greenfield scaffold per architecture starter).
+# Within each epic, stories are strictly ordered (no forward dependency).
+#
+# CARRY-FORWARD ANCHORS (already in story ACs; do not lose during dev):
+#   - FR50 deterministic settlement spec  -> 5-1-settlement-deterministic-fn
+#       + CI invariant settlement_sum==parsed_sum
+#   - LLM-Ops NFR-L1..L5 + degradation    -> 1-4-vision-llm-parse
+#   - device-token authz NFR-S2           -> 4-1 / 4-3
+#   - architecture gap G1 (FR37 receipt endpoint) -> 5-2-settlement-page-trust-thumbnail
+#   - architecture gap G2 (pg-boss not in Drizzle migration; init order
+#     Drizzle migrate -> pg-boss start)   -> 1-1-project-scaffold-ci
+#   - regression fixtures parsed_sum==2208.50 + 3-5 variants -> 1-1 (CI harness) / 1-4
+#   - 30-day verifiable destruction NFR-S4 -> 6-1-30day-verifiable-destroy
+#   - noindex triple NFR-S6               -> 6-2-noindex-anti-discovery
+# Minor (resolve at create-story, not scheduled separately):
+#   each story states its own Drizzle schema DDL.
+
+generated: 2026-05-19
+last_updated: 2026-05-19T14:19
+project: splitting_tools
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # ---- Epic 1: 拍照解析 (FR1-7, FR43, FR46) ----
+  epic-1: in-progress
+  1-1-project-scaffold-ci: in-progress
+  1-2-capture-compress-mask: review
+  1-3-async-parse-job-polling: backlog
+  1-4-vision-llm-parse: backlog
+  1-5-irc-match-parsed-sum: backlog
+  1-6-receipt-structure-reject: backlog
+  1-7-parse-endpoint-budget: backlog
+  epic-1-retrospective: optional
+
+  # ---- Epic 2: 核對閘門 (FR8-16) ----
+  epic-2: backlog
+  2-1-reconciliation-display: backlog
+  2-2-suspicious-line-locate: backlog
+  2-3-line-edit-add-delete: backlog
+  2-4-irc-rebind-parent: backlog
+  2-5-manual-printed-total: backlog
+  2-6-unverified-force-pass: backlog
+  2-7-never-deadlock-guarantee: backlog
+  epic-2-retrospective: optional
+
+  # ---- Epic 3: 出連結 (FR17-19) ----
+  epic-3: backlog
+  3-1-unguessable-link: backlog
+  3-2-anti-scam-message-card: backlog
+  3-3-share-to-group: backlog
+  epic-3-retrospective: optional
+
+  # ---- Epic 4: 朋友自助認領 (FR20-34, FR47-49) ----
+  epic-4: backlog
+  4-1-noauth-entry-device-token: backlog
+  4-2-identity-picker-name-memory: backlog
+  4-3-fix-identity-token-isolation: backlog
+  4-4-claim-toggle-subtotal: backlog
+  4-5-weighted-multi-claim: backlog
+  4-6-claim-done-undo: backlog
+  4-7-pending-race-authority: backlog
+  4-8-claim-board-polling: backlog
+  4-9-payer-change-log: backlog
+  epic-4-retrospective: optional
+
+  # ---- Epic 5: 結算與結束 (FR35-42, FR50) ----
+  epic-5: backlog
+  5-1-settlement-deterministic-fn: backlog
+  5-2-settlement-page-trust-thumbnail: backlog
+  5-3-plaintext-export: backlog
+  5-4-payer-absorb-finalize: backlog
+  5-5-freeze-readonly-late-joiner: backlog
+  epic-5-retrospective: optional
+
+  # ---- Epic 6: 資料生命週期與隱私 (FR44-45) ----
+  epic-6: backlog
+  6-1-30day-verifiable-destroy: backlog
+  6-2-noindex-anti-discovery: backlog
+  epic-6-retrospective: optional

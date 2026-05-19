@@ -1,0 +1,20 @@
+# worker service — pg-boss consumer entrypoint (Story 1.1: boot order only).
+# Runs src/workers/index.ts via tsx. tsx is a devDependency, so a full
+# install (dev + prod) is intentional here.
+# syntax=docker/dockerfile:1
+FROM node:22-alpine
+RUN corepack enable
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
+
+# Source + the generated migrations the worker applies before pg-boss start.
+COPY tsconfig.json ./
+COPY src ./src
+COPY drizzle ./drizzle
+
+ENV NODE_ENV=production
+# G2 boot order (wait DB -> drizzle migrate -> pg-boss start) lives in
+# src/workers/index.ts.
+CMD ["pnpm", "worker"]

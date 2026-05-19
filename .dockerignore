@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.env*
+!.env.example
+_bmad
+_bmad-output
+docs
+.claude
+npm-debug.log*
+.DS_Store
+coverage

@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>splitting_tools — UX 設計方向 showcase（朋友認領 + 看板畫面）</title>
+<style>
+  :root{
+    --bg:#fafafa; --surface:#fff; --ink:#1c1c1c; --muted:#6b7280; --line:#e5e7eb;
+    --accent:#2563eb; --success:#15803d; --success-bg:#dcfce7;
+    --warn:#b45309; --warn-bg:#fef3c7; --danger:#b91c1c; --pending:#9ca3af;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang TC","Noto Sans TC",sans-serif;}
+  header.top{padding:20px 24px;border-bottom:1px solid var(--line);background:#fff}
+  header.top h1{margin:0 0 4px;font-size:18px}
+  header.top p{margin:0;color:var(--muted);font-size:13px;line-height:1.5}
+  .grid{display:flex;flex-wrap:wrap;gap:28px;padding:28px;align-items:flex-start}
+  .col{width:340px}
+  .label{font-size:13px;font-weight:600;margin:0 0 2px}
+  .sub{font-size:12px;color:var(--muted);margin:0 0 10px;line-height:1.5;min-height:48px}
+  .phone{width:340px;background:var(--surface);border:1px solid var(--line);
+    border-radius:26px;overflow:hidden;box-shadow:0 6px 22px rgba(0,0,0,.07)}
+  .scr{height:560px;display:flex;flex-direction:column}
+  .nb{flex:0 0 auto;padding:10px 14px;font-size:12px;color:var(--muted);
+    border-bottom:1px solid var(--line);display:flex;justify-content:space-between}
+  .stick-top{flex:0 0 auto;padding:12px 14px;background:#fff;border-bottom:1px solid var(--line)}
+  .subt{display:flex;justify-content:space-between;align-items:baseline}
+  .subt b{font-size:20px;font-variant-numeric:tabular-nums}
+  .badge{display:inline-flex;gap:5px;align-items:center;font-size:12px;font-weight:600;
+    color:var(--success);background:var(--success-bg);padding:3px 8px;border-radius:999px;margin-top:6px}
+  .body{flex:1 1 auto;overflow:auto;padding:8px 0}
+  .row{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line)}
+  .ck{width:22px;height:22px;border:2px solid var(--line);border-radius:6px;flex:0 0 auto}
+  .ck.on{background:var(--accent);border-color:var(--accent);position:relative}
+  .ck.on::after{content:"✓";color:#fff;font-size:14px;position:absolute;left:3px;top:-2px}
+  .nm{flex:1 1 auto;font-size:14px;line-height:1.35}
+  .nm small{display:block;color:var(--muted);font-size:11px}
+  .amt{font-size:14px;font-variant-numeric:tabular-nums;font-weight:600}
+  .row.pending{background:repeating-linear-gradient(45deg,#fff,#fff 7px,#fafafa 7px,#fafafa 14px)}
+  .pill{font-size:10px;color:var(--pending);border:1px dashed var(--pending);border-radius:999px;padding:1px 7px}
+  .chips{display:flex;gap:3px}
+  .chip{width:20px;height:20px;border-radius:50%;background:#e0e7ff;color:#3730a3;
+    font-size:10px;display:flex;align-items:center;justify-content:center;font-weight:700}
+  .chip.share{background:#fee2e2;color:#991b1b}
+  .stick-bot{flex:0 0 auto;padding:12px 14px;border-top:1px solid var(--line);background:#fff}
+  .cta{display:block;width:100%;text-align:center;background:var(--accent);color:#fff;
+    border:none;border-radius:12px;padding:13px;font-size:15px;font-weight:600}
+  .tabs{display:flex;border-bottom:1px solid var(--line)}
+  .tab{flex:1;text-align:center;padding:10px;font-size:13px;color:var(--muted)}
+  .tab.on{color:var(--ink);font-weight:700;border-bottom:2px solid var(--accent)}
+  .drawer{flex:0 0 auto;border-top:1px solid var(--line);background:#fff;padding:12px 14px}
+  .drawer .h{font-size:12px;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:8px}
+  .board{display:flex;gap:6px;flex-wrap:wrap}
+  .who{font-size:11px;background:#f3f4f6;border-radius:999px;padding:3px 9px}
+  .who.me{background:#dbeafe;color:#1e40af;font-weight:600}
+  .warnbar{background:var(--warn-bg);color:var(--warn);font-size:12px;padding:8px 14px;
+    display:flex;gap:6px;align-items:center}
+  .note{font-size:12px;color:var(--muted);margin:10px 2px 0;line-height:1.55}
+  .note b{color:var(--ink)}
+  .lock{font-size:11px;color:var(--muted);padding:14px 28px;border-top:1px solid var(--line);background:#fff;line-height:1.6}
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>splitting_tools — UX 設計方向 showcase</h1>
+  <p>聚焦定義性畫面：<b>朋友開連結後逐行認領 + 即時應付小計 + 看板</b>。
+  共同遵循已鎖視覺基礎（系統字體、金額 tabular-nums、語意色：成功綠✓／琥珀警示／中性 PENDING／單一 accent CTA、行動單欄、≥44px 熱區、shadcn/Radix）。
+  方向差異只在「資訊密度 × 看板整合方式 × 小計呈現」這三個真正有決策價值的軸。情境資料取自真實 #5564（¥2,208.50）。</p>
+</header>
+
+<div class="grid">
+
+  <!-- A -->
+  <div class="col">
+    <p class="label">方向 A — 清單優先 · 頂部黏性小計</p>
+    <p class="sub">最高密度單欄清單，勾選在左、金額在右。小計與「✓對得上」常駐頂部。看板為可收合次要資訊。</p>
+    <div class="phone"><div class="scr">
+      <div class="nb"><span>小美的分帳</span><span>🔒 私密連結</span></div>
+      <div class="stick-top"><div class="subt"><span>我目前應付</span><b>¥412.00</b></div>
+        <span class="badge">✓ 對得上總計 ¥2,208.50</span></div>
+      <div class="body">
+        <div class="row"><div class="ck on"></div><div class="nm">科克蘭有機蛋 24入<small>KS ORG EGGS 24CT</small></div><div class="amt">¥89.90</div></div>
+        <div class="row"><div class="ck on"></div><div class="nm">五號電池 48入<small>KS 5号电池48入</small></div><div class="amt">¥129.00</div></div>
+        <div class="row"><div class="ck"></div><div class="nm">威士忌 700ml<small>淨價含 IRC −¥40</small></div><div class="amt">¥259.00</div></div>
+        <div class="row pending"><div class="ck"></div><div class="nm">舒潔衛生紙 30入 <span class="pill">未認領</span></div><div class="amt">¥86.00</div></div>
+      </div>
+      <div class="stick-bot"><button class="cta">我認領完了</button></div>
+    </div></div>
+    <p class="note"><b>高互動區契合：</b>核對信任標示常駐；PENDING 行斜線+標籤明顯。<b>取捨：</b>看板被藏，誰領了什麼要額外點開。</p>
+  </div>
+
+  <!-- B -->
+  <div class="col">
+    <p class="label">方向 B — 卡片式 · 底部摘要抽屜</p>
+    <p class="sub">每行為卡片含認領者頭像；小計與看板收進底部可拉抽屜，主畫面聚焦勾選。</p>
+    <div class="phone"><div class="scr">
+      <div class="nb"><span>小美的分帳</span><span>🔒</span></div>
+      <div class="body" style="padding:12px">
+        <div class="row" style="border:1px solid var(--line);border-radius:12px;margin-bottom:10px">
+          <div class="ck on"></div><div class="nm">科克蘭有機蛋 24入</div><div class="chips"><div class="chip">美</div></div><div class="amt">¥89.90</div></div>
+        <div class="row" style="border:1px solid var(--line);border-radius:12px;margin-bottom:10px">
+          <div class="ck"></div><div class="nm">舒潔衛生紙 30入<small>多人分 美:1 哲:1</small></div><div class="chips"><div class="chip">美</div><div class="chip">哲</div></div><div class="amt">¥43.00</div></div>
+        <div class="row pending" style="border:1px dashed var(--pending);border-radius:12px">
+          <div class="ck"></div><div class="nm">可樂 24罐 <span class="pill">未認領</span></div><div class="amt">¥56.00</div></div>
+      </div>
+      <div class="drawer"><div class="h"><span>我應付 <b style="color:var(--ink);font-size:16px">¥412.00</b></span><span class="badge">✓ 對得上</span></div>
+        <div class="board"><span class="who me">小美 ✓完成</span><span class="who">阿哲 認領中</span><span class="who">小華 未加入</span></div></div>
+      <div class="stick-bot"><button class="cta">我認領完了</button></div>
+    </div></div>
+    <p class="note"><b>高互動區契合：</b>多人加權份額在卡片內可視；看板抽屜常駐一覽。<b>取捨：</b>密度低，長收據捲動較久。</p>
+  </div>
+
+  <!-- C -->
+  <div class="col">
+    <p class="label">方向 C — 分段 Tab · 「全部 / 我的」</p>
+    <p class="sub">頂部 tab 切「全部品項 / 我的」。專注模式降低長收據認知負荷，付款人核對在「全部」。</p>
+    <div class="phone"><div class="scr">
+      <div class="nb"><span>小美的分帳</span><span>🔒</span></div>
+      <div class="tabs"><div class="tab">全部 (28)</div><div class="tab on">我的 (3)</div><div class="tab">未認領 (2)</div></div>
+      <div class="stick-top"><div class="subt"><span>我目前應付</span><b>¥412.00</b></div><span class="badge">✓ 對得上總計</span></div>
+      <div class="body">
+        <div class="row"><div class="ck on"></div><div class="nm">科克蘭有機蛋 24入</div><div class="amt">¥89.90</div></div>
+        <div class="row"><div class="ck on"></div><div class="nm">五號電池 48入</div><div class="amt">¥129.00</div></div>
+        <div class="row"><div class="ck on"></div><div class="nm">舒潔衛生紙（美:1 哲:1）<small>多人分攤</small></div><div class="amt">¥43.00</div></div>
+      </div>
+      <div class="stick-bot"><button class="cta">我認領完了</button></div>
+    </div></div>
+    <p class="note"><b>高互動區契合：</b>「未認領」獨立 tab 讓 PENDING 一目了然；專注降噪。<b>取捨：</b>看板需另一 tab/區，狀態可見性較弱。</p>
+  </div>
+
+  <!-- D (recommended) -->
+  <div class="col">
+    <p class="label">方向 D — 看板內嵌清單（推薦基底）</p>
+    <p class="sub">看板「織入」每一行——每行直接顯示誰領了（頭像 chip），不需切到獨立看板畫面。輪詢就地更新該行 chip，不重排不閃爍。</p>
+    <div class="phone"><div class="scr">
+      <div class="nb"><span>小美的分帳 · 3 人在線</span><span>🔒</span></div>
+      <div class="stick-top"><div class="subt"><span>我目前應付</span><b>¥412.00</b></div><span class="badge">✓ 對得上總計 ¥2,208.50</span></div>
+      <div class="body">
+        <div class="row"><div class="ck on"></div><div class="nm">科克蘭有機蛋 24入</div><div class="chips"><div class="chip">美</div></div><div class="amt">¥89.90</div></div>
+        <div class="row"><div class="ck"></div><div class="nm">威士忌 700ml<small>含 IRC −¥40</small></div><div class="chips"><div class="chip">哲</div></div><div class="amt">¥259</div></div>
+        <div class="row"><div class="ck on"></div><div class="nm">舒潔衛生紙 30入<small>多人分 美:1 / 哲:1</small></div><div class="chips"><div class="chip">美</div><div class="chip">哲</div></div><div class="amt">¥43.00</div></div>
+        <div class="row pending"><div class="ck"></div><div class="nm">可樂 24罐 <span class="pill">沒人領</span></div><div class="amt">¥56.00</div></div>
+      </div>
+      <div class="stick-bot"><button class="cta">我認領完了</button></div>
+    </div></div>
+    <p class="note"><b>高互動區契合：</b>FR47–49 看板與認領同畫面、輪詢就地更新最穩定不閃爍；社交壓力即時可見；PENDING 同列呈現。<b>最貼合定義性體驗。</b></p>
+  </div>
+
+  <!-- E -->
+  <div class="col">
+    <p class="label">方向 E — 極簡聚焦 · 一次一決策</p>
+    <p class="sub">最少 chrome、大字大點擊區，賣場單手最快。一頁勾完、最後一屏才看摘要。</p>
+    <div class="phone"><div class="scr">
+      <div class="nb"><span>是你的就點一下</span><span>🔒</span></div>
+      <div class="body" style="padding:6px 0">
+        <div class="row" style="padding:18px 16px"><div class="ck on"></div><div class="nm" style="font-size:16px">科克蘭有機蛋 24入</div><div class="amt">¥89.90</div></div>
+        <div class="row" style="padding:18px 16px"><div class="ck on"></div><div class="nm" style="font-size:16px">五號電池 48入</div><div class="amt">¥129.00</div></div>
+        <div class="row" style="padding:18px 16px"><div class="ck" ></div><div class="nm" style="font-size:16px">威士忌 700ml</div><div class="amt">¥259</div></div>
+      </div>
+      <div class="warnbar">⚠ 此分帳未經對帳驗證（付款人強制放行）</div>
+      <div class="stick-bot"><div class="subt" style="margin-bottom:8px"><span>我應付</span><b style="font-size:18px;font-variant-numeric:tabular-nums">¥412.00</b></div><button class="cta">我認領完了</button></div>
+    </div></div>
+    <p class="note"><b>高互動區契合：</b>賣場單手最快；範例含「未驗證」橫幅措辭呈現。<b>取捨：</b>看板/多人份額需另開，狀態可見性最弱。</p>
+  </div>
+
+</div>
+
+<div class="lock">
+  <b>評估準則：</b>① 版式直覺度（長收據可掃）② 看板狀態可見性（FR47–49 不靠人催、輪詢不閃爍）
+  ③ 定義性體驗契合（勾選+即時小計+看板）④ 6 高互動區承載 ⑤ 行動單手 ⑥ 與已鎖視覺基礎一致。<br>
+  全部方向皆共用已鎖視覺基礎（無品牌、語意色、tabular-nums、shadcn/Radix、≥44px）。可單選或組合（例：D 基底 + A 的頂部黏性小計 + C 的「未認領」快速篩選）。
+</div>
+</body>
+</html>

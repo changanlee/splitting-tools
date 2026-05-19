@@ -1,0 +1,66 @@
+installation:
+  version: 6.6.0
+  installDate: 2026-05-17T09:17:27.607Z
+  lastUpdated: 2026-05-17T09:17:27.607Z
+modules:
+  - name: core
+    version: 6.6.0
+    installDate: 2026-05-17T09:17:24.032Z
+    lastUpdated: 2026-05-17T09:17:26.189Z
+    source: built-in
+    npmPackage: null
+    repoUrl: null
+  - name: bmb
+    version: v1.8.0
+    installDate: 2026-05-17T09:17:24.476Z
+    lastUpdated: 2026-05-17T09:17:26.355Z
+    source: external
+    npmPackage: bmad-builder
+    repoUrl: https://github.com/bmad-code-org/bmad-builder
+    channel: stable
+    sha: d64469f61fadc6cfbf2dea6a0a257fe6eb2790a2
+  - name: bmm
+    version: 6.6.0
+    installDate: 2026-05-17T09:17:24.641Z
+    lastUpdated: 2026-05-17T09:17:26.356Z
+    source: built-in
+    npmPackage: null
+    repoUrl: null
+  - name: cis
+    version: v0.2.0
+    installDate: 2026-05-17T09:17:24.792Z
+    lastUpdated: 2026-05-17T09:17:26.524Z
+    source: external
+    npmPackage: bmad-creative-intelligence-suite
+    repoUrl: https://github.com/bmad-code-org/bmad-module-creative-intelligence-suite
+    channel: stable
+    sha: 14a63b893c07173b7a6cfe0fb6a9a72ba51d3cf1
+  - name: gds
+    version: v0.5.0
+    installDate: 2026-05-17T09:17:25.157Z
+    lastUpdated: 2026-05-17T09:17:27.103Z
+    source: external
+    npmPackage: bmad-game-dev-studio
+    repoUrl: https://github.com/bmad-code-org/bmad-module-game-dev-studio
+    channel: stable
+    sha: 9dcd12538accc0f80a895841c2a19da5d362a6d6
+  - name: tea
+    version: v1.18.0
+    installDate: 2026-05-17T09:17:25.753Z
+    lastUpdated: 2026-05-17T09:17:27.355Z
+    source: external
+    npmPackage: bmad-method-test-architecture-enterprise
+    repoUrl: https://github.com/bmad-code-org/bmad-method-test-architecture-enterprise
+    channel: stable
+    sha: 34a242c1379a1fdb4b812b4dc94f52df764341bb
+  - name: baut
+    version: main
+    installDate: 2026-05-17T09:17:26.025Z
+    lastUpdated: 2026-05-17T09:17:27.607Z
+    source: external
+    npmPackage: bmad-story-automator
+    repoUrl: https://github.com/bmad-code-org/bmad-automator
+    channel: next
+    sha: 956198ca52bb3342b73567f76f5981950286f8d8
+ides:
+  - claude-code
