@@ -4,6 +4,12 @@
  * Story 1.2b multi-page capture. Mirrors the geometry.ts pure-fn pattern:
  * all list maths lives here so the canvas/pointer glue (CaptureFlow /
  * PageList) never needs a browser env to be tested.
+ *
+ * Every export is a pure function EXCEPT {@link nextPageId} — the one
+ * intentional impurity (a monotonic id factory). It is kept here so id
+ * generation stays out of the DOM glue; its only effect is an internal
+ * counter and `Date.now()`, and it is exercised by the test for
+ * uniqueness, not purity.
  */
 
 export interface Page {
@@ -90,8 +96,11 @@ export function orderedPageIds(list: Page[]): string[] {
 
 /**
  * Best-effort, NON-cryptographic content signature for dedupe (AC4).
- * FNV-1a (32-bit) over the byte size + a byte sample. Not for security —
- * only to drop an identical accidental re-capture.
+ * FNV-1a (32-bit) over the byte size + the caller-supplied bytes. The
+ * caller MUST pass the FULL masked-blob bytes (not a short prefix):
+ * same-device JPEGs share header prefixes, so a sampled signature would
+ * collide across distinct receipt pages and silently drop a real page.
+ * Not for security — only to drop an exact accidental re-capture.
  */
 export function computeSignature(
   size: number,

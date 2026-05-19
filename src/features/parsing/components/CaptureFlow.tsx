@@ -56,9 +56,6 @@ type Phase =
   | { k: "ready"; blobs: Blob[] }
   | { k: "error"; message: string };
 
-/** Bytes sampled from the masked blob to build the dedupe signature. */
-const SIGNATURE_SAMPLE_BYTES = 1024;
-
 function friendlyError(err: unknown): string {
   if (err instanceof ImageDecodeError) {
     return "這張圖片無法在你的裝置開啟（可能是不支援的格式）。請改用相機拍一張，或換一張照片。";
@@ -90,6 +87,17 @@ export function CaptureFlow() {
     // Reset so picking the same file again still fires onChange (AC1).
     e.target.value = "";
     if (!file) return;
+    // The OS picker is async: a file can arrive AFTER the user already
+    // tapped 完成 (phase → ready) or while mid-flow. Only honour a pick
+    // from a state that legitimately initiated one, else the finished
+    // Blob[] (Story 1.3 contract) would be silently discarded.
+    if (
+      phase.k !== "idle" &&
+      phase.k !== "review" &&
+      phase.k !== "error"
+    ) {
+      return;
+    }
 
     setPhase({ k: "compressing" });
     try {
@@ -108,13 +116,16 @@ export function CaptureFlow() {
     setPhase({ k: "compressing" });
     try {
       const blob = await applyMaskAndEncode(canvas, skipConfirmed ? [] : rects);
-      // Dedupe signature: size + a small byte sample of the MASKED blob.
-      const sampleBuf = await blob
-        .slice(0, SIGNATURE_SAMPLE_BYTES)
-        .arrayBuffer();
+      // Dedupe signature over the FULL masked bytes (NOT a 1 KB prefix):
+      // same-device JPEGs share header/quantization-table prefixes, so a
+      // short sample collides across DISTINCT receipt pages and would
+      // silently drop a real page at finish(). Hashing all bytes makes a
+      // false-positive drop effectively impossible while still catching an
+      // exact accidental re-capture. Receipt blobs are ~hundreds of KB.
+      const fullBuf = await blob.arrayBuffer();
       const signature = computeSignature(
         blob.size,
-        new Uint8Array(sampleBuf),
+        new Uint8Array(fullBuf),
       );
       const item: PageItem = {
         id: nextPageId(),
@@ -133,17 +144,21 @@ export function CaptureFlow() {
   const onRetakeCurrent = () =>
     setPhase(pages.length > 0 ? { k: "review" } : { k: "idle" });
 
-  const handleRemove = (id: string) =>
-    setPages((prev) => {
-      const target = prev.find((p) => p.id === id);
-      if (target) URL.revokeObjectURL(target.thumbUrl);
-      return removePage(prev, id);
-    });
+  const handleRemove = (id: string) => {
+    const target = pages.find((p) => p.id === id);
+    if (target) URL.revokeObjectURL(target.thumbUrl);
+    const next = removePage(pages, id);
+    setPages(next);
+    // Removing the last page would otherwise strand the user on an empty
+    // review screen with 完成 disabled — send them back to start.
+    if (next.length === 0) setPhase({ k: "idle" });
+  };
 
   const handleMove = (id: string, dir: "up" | "down") =>
     setPages((prev) => movePage(prev, id, dir));
 
   const finish = () => {
+    if (phase.k !== "review") return; // re-entrancy / stray-state guard
     const deduped = dedupePages(pages);
     // Revoke thumbnails of pages dropped by dedupe (no leaked URLs).
     const kept = new Set(deduped.map((p) => p.id));
@@ -157,8 +172,12 @@ export function CaptureFlow() {
   };
 
   const resetAll = () => {
-    pagesRef.current.forEach((p) => URL.revokeObjectURL(p.thumbUrl));
-    setPages([]);
+    // Functional updater: revoke whatever the CURRENT list is, never a
+    // lagging ref (kills the stale-ref double/missed-revoke class).
+    setPages((prev) => {
+      prev.forEach((p) => URL.revokeObjectURL(p.thumbUrl));
+      return [];
+    });
     setPhase({ k: "idle" });
   };
 

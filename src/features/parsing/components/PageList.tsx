@@ -34,7 +34,7 @@ export function PageList({ pages, onMove, onRemove }: PageListProps) {
           <img
             src={page.thumbUrl}
             alt={`第 ${i + 1} 頁（已遮蔽）`}
-            className="size-16 shrink-0 rounded object-cover"
+            className="size-16 shrink-0 rounded bg-muted object-contain"
           />
           <span className="flex-1 text-sm font-medium">第 {i + 1} 頁</span>
 
