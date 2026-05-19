@@ -38,6 +38,9 @@ function init(): void {
 function lazyProxy<T extends object>(pick: () => T): T {
   return new Proxy({} as T, {
     get(_target, prop) {
+      // Not a thenable: an accidental `await db` / Promise.resolve(db)
+      // must NOT run init() early nor treat the proxy as a promise.
+      if (prop === "then") return undefined;
       init();
       const real = pick() as Record<string | symbol, unknown>;
       const value = real[prop];

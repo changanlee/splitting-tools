@@ -39,6 +39,14 @@ export async function GET(
   // Defensive: the DB column is free-text (W-CR-3). Validate before
   // trusting it; an unexpected value degrades to "failed" (never spin).
   const parsed = ParseJobStatusSchema.safeParse(row.status);
+  if (!parsed.success) {
+    // Free-text column (W-CR-3): an unknown value is a contract bug.
+    // Log it (observability) and fail CLOSED so the poller terminates
+    // (NFR-R2 never-deadlock) rather than spinning on an unknown.
+    console.warn(
+      `[parse-status] unexpected status "${row.status}" for job ${jobId}`,
+    );
+  }
   const status = parsed.success ? parsed.data : "failed";
 
   const body: ParseStatusResponse = {

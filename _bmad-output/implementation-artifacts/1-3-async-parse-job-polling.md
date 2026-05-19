@@ -1,6 +1,6 @@
 # Story 1.3: 非阻塞解析提交與進度輪詢（多頁上傳契約）
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -150,3 +150,28 @@ claude-opus-4-7[1m]（dev-story，2026-05-20）
 - `src/lib/db/client.ts`（M：lazy 化修 next build 回歸；export 面/契約不變）
 - `package.json`（M：+zod@4.4.3 +@tanstack/react-query@5.100.10）
 - `_bmad-output/implementation-artifacts/{1-3-...md,sprint-status.yaml,deferred-work.md}`（M）
+
+## Review Findings（code review 2026-05-20，**full 模式**，commit 4266b90，4 hunters）
+
+> Blind / Edge Case / Acceptance Auditor / **LLM Compliance**（1-3 LLM-boundary）。
+> LLM Compliance = **CLEAN**（zero findings：producer-only、item3 on-spec、
+> 1/2/4/5⏸1.4 無提前 LLM/無繞過、7 budget seam called pre-enqueue）。
+> Acceptance Auditor = 無 AC/scope 違規（2 LOW 已路由 W-1-3-1）。9 patch 已自主修復、閘門綠。
+
+- [x] [Patch][High] pg-boss 單例：`boss.start()` 失敗會永久毒化快取 promise → 失敗時 reset `bossPromise=null` 可重試；`createQueue` 非 silent（log）。
+- [x] [Patch][High] enqueue 失敗後 `markJobFailed().catch(()=>{})` 全靜默 → 改 log（非 silent）；並加輪詢硬上限作 backstop。
+- [x] [Patch][High] 上傳無大小上限 → 讀入前以 `file.size` 擋 0-byte（400）與 >8MB/檔（413），有界記憶體。
+- [x] [Patch][Med] `pageCount` 解析一次成驗證後整數，驗證與 payload 同源（無 coercion drift）。
+- [x] [Patch][Med] submit 前 `sessionExists(linkId)` → 不存在回 404（非 FK→502、不產生孤兒 job）。
+- [x] [Patch][Med] CaptureFlow `uploadAndParse` 重入守衛（非 ready/uploadError 即 return）；uploadError 保留 `linkId`，retry 重用同 session（不再產生孤兒 session）。
+- [x] [Patch][Med] 輪詢硬上限 `MAX_POLL_MS=180s`（effect-timer + key 派生，render 純；React Compiler 合規）→ 逾時友善終態+重試（NFR-R2 永不卡死；亦解「1.4 消費者未存在時永遠 queued」UX）。
+- [x] [Patch][Low] lazy db Proxy 非 thenable（`then`→undefined，不誤觸 init / 不被當 promise）。
+- [x] [Patch][Low] status route 對未知 free-text status 先 log（telemetry）再 fail-closed。
+- [By-design/defer] 廣義 authz/ownership（開放寫入端點）＝**鎖定排序使然**：不可猜連結＝Story 3.1（本 story randomUUID placeholder，未 pre-empt），device-token authz＝Epic 4；非 1.3 缺陷（Acceptance Auditor 確認無 scope 違規）。已加 sessionExists 404 縮小面。
+- [Defer] 影像 base64 入 pg-boss payload 明文/保留 → 30 天銷毀＝Story 6.1、規模化移物件儲存＝`W-1-3-2`（已登記）。AC1 p95<1s 實機量測＝`W-1-3-1`（已登記）。
+- [Dismiss×~7] lazy init 競態（init 同步、JS 單緒，無 await→無 check-then-act，誤報）；worker 不存在＝by-design（1.4；輪詢上限已處理 UX）；getJobStatus 走 PK 非該 index（PK O(1) 更優，AC 文字不精確）；markJobFailed updatedAt vs createQueuedJob（schema 有 defaultNow，update 正確 bump，無 bug）；Promise.all 批次/Providers retry 調校（可接受預設）；idempotency-key（過度工程，client 守衛+session 重用已足）。
+- 驗證：typecheck/lint(0/0)/test(5 files 56 pass+2 todo,0 回歸)/build(3 ƒ Dynamic) 全綠；AC5 影像零 log；React Compiler 規則合規（render 純、effect 無同步 setState）。Status review→done。
+
+### Change Log（appended）
+
+- 2026-05-20：code review（full，4 hunters；LLM-Compliance clean）→ 9 patch 自主修復（pg-boss 韌性 / 不靜默 / 大小上限 / pageCount 同源 / session 404 / 重入守衛+session 重用 / 輪詢硬上限 / proxy 非 thenable / status telemetry）。閘門綠，Status review→done。

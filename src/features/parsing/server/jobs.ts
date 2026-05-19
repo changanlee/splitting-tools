@@ -23,6 +23,17 @@ export async function createSession(): Promise<string> {
   return id;
 }
 
+/** Does a session/link exist? Lets the submit route return a clean
+ *  404 instead of an FK violation surfacing as a generic 502. */
+export async function sessionExists(linkId: string): Promise<boolean> {
+  const rows = await db
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(eq(sessions.id, linkId))
+    .limit(1);
+  return rows.length > 0;
+}
+
 /** Create a queued parse_jobs row for an existing session. */
 export async function createQueuedJob(sessionId: string): Promise<string> {
   const id = randomUUID();

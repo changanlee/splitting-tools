@@ -29,7 +29,7 @@ export function ParseProgress({
   jobId,
   onRetry,
 }: ParseProgressProps) {
-  const { data, isError } = useParseJobPolling(linkId, jobId);
+  const { data, isError, timedOut } = useParseJobPolling(linkId, jobId);
 
   // Network/fetch failure (status endpoint unreachable) — friendly + retry.
   if (isError) {
@@ -41,6 +41,22 @@ export function ParseProgress({
         </p>
         <Button type="button" className="h-12 w-full" onClick={onRetry}>
           重試
+        </Button>
+      </div>
+    );
+  }
+
+  // Hard poll-ceiling reached without a terminal status — never leave
+  // the payer spinning forever (NFR-R2). Friendly terminal + retry.
+  if (timedOut) {
+    return (
+      <div className="flex flex-col gap-4" role="alert">
+        <p className="flex items-center gap-2 text-sm font-medium text-destructive">
+          <AlertTriangleIcon className="size-5 shrink-0" aria-hidden />
+          解析時間過長，請重試一次。
+        </p>
+        <Button type="button" className="h-12 w-full" onClick={onRetry}>
+          重拍重試
         </Button>
       </div>
     );

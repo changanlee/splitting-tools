@@ -28,7 +28,10 @@ function connectionString(): string {
   return url;
 }
 
-/** Lazy singleton: start pg-boss once, ensure the queue exists once. */
+/** Lazy singleton: start pg-boss once, ensure the queue exists once.
+ *  A FAILED start must NOT poison the singleton forever — reset the
+ *  cached promise so a later request can retry (transient DB blip
+ *  recovery; LLM-era standard for external boundaries). */
 async function getBoss(): Promise<PgBoss> {
   if (!bossPromise) {
     bossPromise = (async () => {
@@ -40,14 +43,19 @@ async function getBoss(): Promise<PgBoss> {
       );
       await boss.start();
       // pg-boss v12 requires an explicit queue; idempotent if it
-      // already exists (the 1.4 worker may also ensure it).
+      // already exists (the 1.4 worker may also ensure it). Log a
+      // non-"already exists" failure rather than fully swallowing it
+      // (a real init failure would otherwise be masked).
       try {
         await boss.createQueue(PARSE_QUEUE);
-      } catch {
-        // queue already exists — safe to ignore.
+      } catch (e) {
+        console.warn("[parse-producer] createQueue:", e);
       }
       return boss;
-    })();
+    })().catch((err) => {
+      bossPromise = null; // allow a later request to retry start()
+      throw err;
+    });
   }
   return bossPromise;
 }

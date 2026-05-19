@@ -17,8 +17,13 @@ import { checkParseBudget } from "@/features/parsing/server/budget";
 import {
   createQueuedJob,
   markJobFailed,
+  sessionExists,
 } from "@/features/parsing/server/jobs";
 import { enqueueParse } from "@/features/parsing/server/queue";
+
+/** Per-file byte cap (masked compressed JPEGs are ~hundreds KB; 8MB is
+ *  a generous abuse ceiling that still bounds request memory). */
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
 function err(code: string, message: string, status: number): Response {
   const body: ErrorEnvelope = { error: { code, message } };
@@ -38,8 +43,16 @@ export async function POST(
     return err("BAD_FORM", "上傳內容無法讀取，請重試。", 400);
   }
 
-  const files = form.getAll("pages").filter((p): p is File => p instanceof File);
-  const pageCount = Number(form.get("pageCount"));
+  const files = form
+    .getAll("pages")
+    .filter((p): p is File => p instanceof File);
+  // Parse pageCount ONCE into a validated integer; the SAME value is
+  // used for validation and the enqueued payload (no coercion drift).
+  const rawPageCount = form.get("pageCount");
+  const pageCount =
+    typeof rawPageCount === "string" && rawPageCount.trim() !== ""
+      ? Number(rawPageCount)
+      : NaN;
 
   const shape = validateParseSubmit({
     pageCount,
@@ -47,9 +60,30 @@ export async function POST(
   });
   if (!shape.ok) return err(shape.code, shape.message, 400);
 
+  // Reject empty / oversized parts BEFORE reading bytes into memory
+  // (bounded request memory; size is known without reading the blob).
+  for (const f of files) {
+    if (f.size === 0) {
+      return err("EMPTY_IMAGE", "有一頁影像是空的，請重拍。", 400);
+    }
+    if (f.size > MAX_IMAGE_BYTES) {
+      return err("IMAGE_TOO_LARGE", "影像檔過大，請重拍一次。", 413);
+    }
+  }
+
   // Story 1.7 seam (default pass at 1.3).
   const budget = checkParseBudget(linkId);
   if (!budget.ok) return err("BUDGET", budget.message, 429);
+
+  // Session must exist (404, not an FK-violation-as-502). Full link
+  // semantics = Story 3.1; device-token authz = Epic 4.
+  let exists: boolean;
+  try {
+    exists = await sessionExists(linkId);
+  } catch {
+    return err("LOOKUP_FAILED", "暫時無法處理，請稍後再試。", 502);
+  }
+  if (!exists) return err("NO_SESSION", "找不到這個分帳，請重新開始。", 404);
 
   // Encode masked pages → base64 (single-Postgres design; bytes never
   // logged — AC5/NFR-S3).
@@ -81,8 +115,12 @@ export async function POST(
     });
   } catch {
     // Reach a terminal state so the poller never spins forever
-    // (NFR-R1/NFR-R2). Friendly message only.
-    await markJobFailed(jobId, "系統忙線，請稍後重試。").catch(() => {});
+    // (NFR-R1/NFR-R2). Friendly message only. If THIS also fails, log
+    // it (never silent-swallow) — the poller's safety cap is the
+    // backstop so the payer is still never deadlocked.
+    await markJobFailed(jobId, "系統忙線，請稍後重試。").catch((e) =>
+      console.error("[parse-submit] markJobFailed failed:", e),
+    );
     return err("ENQUEUE_FAILED", "系統忙線，請稍後重試。", 502);
   }
 

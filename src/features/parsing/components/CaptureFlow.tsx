@@ -62,7 +62,9 @@ type Phase =
   | { k: "ready"; blobs: Blob[] }
   | { k: "uploading" }
   | { k: "parsing"; linkId: string; jobId: string }
-  | { k: "uploadError"; blobs: Blob[] } // keep masked pages on a net blip
+  // keep masked pages + the created linkId on a net blip so retry
+  // re-submits to the SAME session (no orphan sessions)
+  | { k: "uploadError"; blobs: Blob[]; linkId?: string }
   | { k: "error"; message: string };
 
 function friendlyError(err: unknown): string {
@@ -194,14 +196,19 @@ export function CaptureFlow() {
   // to leave the device — NFR-S3; the unmasked originals never existed
   // here) → create session → enqueue parse → poll. On a network blip we
   // keep the masked pages so the payer needn't re-capture.
-  const uploadAndParse = async (blobs: Blob[]) => {
+  const uploadAndParse = async (blobs: Blob[], existingLinkId?: string) => {
+    // Re-entrancy guard: only a ready/uploadError state may start an
+    // upload; the synchronous setPhase below then unmounts the trigger
+    // (a double-tap can't create two sessions/jobs).
+    if (phase.k !== "ready" && phase.k !== "uploadError") return;
     setPhase({ k: "uploading" });
+    let linkId = existingLinkId;
     try {
-      const sRes = await fetch("/api/splits", { method: "POST" });
-      if (!sRes.ok) throw new Error("session");
-      const { linkId } = CreateSessionResponseSchema.parse(
-        await sRes.json(),
-      );
+      if (!linkId) {
+        const sRes = await fetch("/api/splits", { method: "POST" });
+        if (!sRes.ok) throw new Error("session");
+        linkId = CreateSessionResponseSchema.parse(await sRes.json()).linkId;
+      }
 
       const fd = new FormData();
       fd.set("pageCount", String(blobs.length));
@@ -216,7 +223,9 @@ export function CaptureFlow() {
 
       setPhase({ k: "parsing", linkId, jobId });
     } catch {
-      setPhase({ k: "uploadError", blobs });
+      // Keep the masked pages AND the linkId (if the session was
+      // created) so retry reuses it — no orphan sessions.
+      setPhase({ k: "uploadError", blobs, linkId });
     }
   };
 
@@ -378,7 +387,7 @@ export function CaptureFlow() {
           <Button
             type="button"
             className="h-12 w-full"
-            onClick={() => uploadAndParse(phase.blobs)}
+            onClick={() => uploadAndParse(phase.blobs, phase.linkId)}
           >
             重新上傳（{phase.blobs.length} 頁）
           </Button>
