@@ -29,6 +29,7 @@ import { Pool } from "pg";
 const MIGRATIONS_FOLDER = "drizzle/migrations";
 const DB_WAIT_MAX_ATTEMPTS = 30;
 const DB_WAIT_DELAY_MS = 2000;
+const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 function getConnectionString(): string {
   const url = process.env.DATABASE_URL;
@@ -42,19 +43,29 @@ function getConnectionString(): string {
 
 /** Step 1: block until Postgres accepts connections (compose race-safe). */
 async function waitForDatabase(pool: Pool): Promise<void> {
+  let lastError: unknown;
   for (let attempt = 1; attempt <= DB_WAIT_MAX_ATTEMPTS; attempt++) {
     try {
       await pool.query("select 1");
       console.log(`[worker] database reachable (attempt ${attempt})`);
       return;
-    } catch {
+    } catch (err) {
+      lastError = err;
+      const detail = err instanceof Error ? err.message : String(err);
+      // Log the real cause every attempt: a permanent misconfig (bad
+      // credentials / DATABASE_URL / SSL) must not masquerade as a
+      // transient "not reachable yet" with no diagnostic.
       console.log(
-        `[worker] waiting for database… (${attempt}/${DB_WAIT_MAX_ATTEMPTS})`,
+        `[worker] waiting for database… (${attempt}/${DB_WAIT_MAX_ATTEMPTS}): ${detail}`,
       );
       await sleep(DB_WAIT_DELAY_MS);
     }
   }
-  throw new Error("[worker] database not reachable after max attempts");
+  const detail =
+    lastError instanceof Error ? lastError.message : String(lastError);
+  throw new Error(
+    `[worker] database not reachable after ${DB_WAIT_MAX_ATTEMPTS} attempts: ${detail}`,
+  );
 }
 
 async function main(): Promise<void> {
@@ -81,14 +92,37 @@ async function main(): Promise<void> {
   // Story 1.1: no job consumers yet. Story 1.3/1.4 register parseWorker
   // via src/lib/llm/visionAdapter (never bypass it).
 
+  let stopping = false;
   const shutdown = async (signal: string) => {
+    // A second signal (e.g. SIGTERM then SIGINT, or a repeated Ctrl-C)
+    // must not re-enter: `pool.end()` twice throws, and racing exits can
+    // truncate in-flight cleanup.
+    if (stopping) return;
+    stopping = true;
     console.log(`[worker] ${signal} received, stopping…`);
-    await boss.stop();
-    await pool.end();
-    process.exit(0);
+
+    const timeout = sleep(SHUTDOWN_TIMEOUT_MS).then(() => {
+      throw new Error(`shutdown exceeded ${SHUTDOWN_TIMEOUT_MS}ms`);
+    });
+    try {
+      // Bounded: if boss.stop()/pool.end() hang or reject, we still exit
+      // instead of wedging the container until SIGKILL.
+      await Promise.race([
+        (async () => {
+          await boss.stop();
+          await pool.end();
+        })(),
+        timeout,
+      ]);
+      console.log("[worker] clean shutdown complete");
+      process.exit(0);
+    } catch (err) {
+      console.error("[worker] shutdown error/timeout, forcing exit:", err);
+      process.exit(1);
+    }
   };
-  process.on("SIGTERM", () => void shutdown("SIGTERM"));
-  process.on("SIGINT", () => void shutdown("SIGINT"));
+  process.once("SIGTERM", () => void shutdown("SIGTERM"));
+  process.once("SIGINT", () => void shutdown("SIGINT"));
 }
 
 main().catch((err) => {
