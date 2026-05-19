@@ -1,6 +1,6 @@
 # Story 1.6: 非 #5564 結構收據明確拒絕（FR7 v1 硬鎖）
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -38,12 +38,12 @@ so that 我不會被靜默誤算出一筆錯誤的分帳（FR7，v1 硬鎖）。
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0：前置** — 確認 1-5 done（`ParsedReceipt`/parseWorker 成功路徑/1.5 P3 persisted-flag 在）；讀 `1-5-irc-match-parsed-sum.md`（parseWorker 成功路徑接點、IRC `PARENT_CODE_RE` 母碼樣式、NFR-R2 終態守衛、Review Outcome）、`epics.md#Story 1.6`、`prd.md` FR7、`architecture.md` L28/L92/L436-444/L667、`src/features/parsing/schema.ts`（`ParsedReceipt`/`ReceiptLine` 契約、`friendlyJobMessage`/`isTerminalStatus`、`ErrorEnvelope` 友善訊息慣例）、`src/workers/parseWorker.ts`（1.5 後成功路徑現況）、`src/features/parsing/server/jobs.ts`（`markJobFailed` 終態守衛）。AGENTS.md：本 story 無新 Next/SDK API，記 Debug Log 即可。
-- [ ] **Task 1：純結構分類器（AC1-AC3, AC7）** — `src/features/parsing/structureGuard.ts`（純，無 IO）：`classifyReceiptStructure(parsed: ParsedReceipt): StructureClassification`（`type StructureRejectReason = "independent_tax_line" | "foreign_currency" | "no_recognizable_product_code" | "structural_inconsistency"`；`type StructureClassification = { ok: true } | { ok: false; reason: StructureRejectReason }`）。偵測：稅關鍵字樣式（多語）+ 獨立金額行 → tax；外幣樣式 → currency；無 `\d{3,}` 母碼行（延用 1.5 母碼語意，避免兩套規則漂移——可抽共用或註記對齊）→ no_product_code；行數 0／無正額品項／全負 → structural_inconsistency。**fail-closed**：未正向確認即 reject。優先序：tax > currency > no_product_code > structural_inconsistency（決定性，測試固定斷言）。`structureGuard.test.ts` 具名 node 測涵蓋 AC7 全列舉 + 明標 synthetic #5564 合格負例。
-- [ ] **Task 2：友善訊息常數（AC5）** — 於 `src/features/parsing/schema.ts`（既有友善訊息/常數所在，單一真實來源；不新增表）新增具名匯出 `STRUCTURE_REJECT_MESSAGE`（繁中文案：語意「v1 僅支援 #5564 同結構收據，暫不支援此張」）；與 `friendlyJobMessage` 慣例一致（NFR-R1：純友善、零系統細節）。
-- [ ] **Task 3：parseWorker 拒絕閘門接線（AC4, AC6, AC8）** — `src/workers/parseWorker.ts` 成功路徑 `outcome.kind === "parsed"`：先 `classifyReceiptStructure(outcome.receipt)`；`ok:false` → `await markJobFailed(data.jobId, STRUCTURE_REJECT_MESSAGE)`（best-effort `.catch`，比照既有失敗分支）、結構化 log `reason`（僅 server，不外洩）、**跳過** attributeIrc/persist、`output = outcome.receipt`（診斷用，既有 W-1-4-3 行為不變）；`ok:true` → 維持 1.5 既有 try 區塊（persisted-flag、終態守衛不動）。結構拒絕為正常分支（非 throw），置於既有 try 內但走 `markJobFailed` 正常路徑，不可觸發未預期 catch 二次 markJobFailed。
-- [ ] **Task 4：regression carry-forward + 誠實（AC7）** — 不偽綠：`regression-invariants.test.ts` REAL #5564 `it.todo` anchor **完全不動**；1.6 不宣稱任何真 #5564 端到端結果（仍 gated W-1-4-1/W-CR-5）；結構分類器證明在 `structureGuard.test.ts`（synthetic fixture 明標非 OCR）。
-- [ ] **Task 5：驗收自查（AC7, AC8）** — `pnpm typecheck`(0)/`lint`(0)/`test`（既有零回歸 + 新 structureGuard 具名測 + parseWorker 型別綠）/`build`(綠)；靜態掃描：`src/lib/llm/**` 零改動、既有表/schema 無結構改動（無 migration）、無新 npm 相依、結構分類不在 route handler、拒絕路徑零寫列。記 Completion Notes 貼閘門證據。
+- [x] **Task 0：前置** — 確認 1-5 done（`ParsedReceipt`/parseWorker 成功路徑/1.5 P3 persisted-flag 在）；讀 `1-5-irc-match-parsed-sum.md`（parseWorker 成功路徑接點、IRC `PARENT_CODE_RE` 母碼樣式、NFR-R2 終態守衛、Review Outcome）、`epics.md#Story 1.6`、`prd.md` FR7、`architecture.md` L28/L92/L436-444/L667、`src/features/parsing/schema.ts`（`ParsedReceipt`/`ReceiptLine` 契約、`friendlyJobMessage`/`isTerminalStatus`、`ErrorEnvelope` 友善訊息慣例）、`src/workers/parseWorker.ts`（1.5 後成功路徑現況）、`src/features/parsing/server/jobs.ts`（`markJobFailed` 終態守衛）。AGENTS.md：本 story 無新 Next/SDK API，記 Debug Log 即可。
+- [x] **Task 1：純結構分類器（AC1-AC3, AC7）** — `src/features/parsing/structureGuard.ts`（純，無 IO）：`classifyReceiptStructure(parsed: ParsedReceipt): StructureClassification`（`type StructureRejectReason = "independent_tax_line" | "foreign_currency" | "no_recognizable_product_code" | "structural_inconsistency"`；`type StructureClassification = { ok: true } | { ok: false; reason: StructureRejectReason }`）。偵測：稅關鍵字樣式（多語）+ 獨立金額行 → tax；外幣樣式 → currency；無 `\d{3,}` 母碼行（延用 1.5 母碼語意，避免兩套規則漂移——可抽共用或註記對齊）→ no_product_code；行數 0／無正額品項／全負 → structural_inconsistency。**fail-closed**：未正向確認即 reject。優先序：tax > currency > no_product_code > structural_inconsistency（決定性，測試固定斷言）。`structureGuard.test.ts` 具名 node 測涵蓋 AC7 全列舉 + 明標 synthetic #5564 合格負例。
+- [x] **Task 2：友善訊息常數（AC5）** — 於 `src/features/parsing/schema.ts`（既有友善訊息/常數所在，單一真實來源；不新增表）新增具名匯出 `STRUCTURE_REJECT_MESSAGE`（繁中文案：語意「v1 僅支援 #5564 同結構收據，暫不支援此張」）；與 `friendlyJobMessage` 慣例一致（NFR-R1：純友善、零系統細節）。
+- [x] **Task 3：parseWorker 拒絕閘門接線（AC4, AC6, AC8）** — `src/workers/parseWorker.ts` 成功路徑 `outcome.kind === "parsed"`：先 `classifyReceiptStructure(outcome.receipt)`；`ok:false` → `await markJobFailed(data.jobId, STRUCTURE_REJECT_MESSAGE)`（best-effort `.catch`，比照既有失敗分支）、結構化 log `reason`（僅 server，不外洩）、**跳過** attributeIrc/persist、`output = outcome.receipt`（診斷用，既有 W-1-4-3 行為不變）；`ok:true` → 維持 1.5 既有 try 區塊（persisted-flag、終態守衛不動）。結構拒絕為正常分支（非 throw），置於既有 try 內但走 `markJobFailed` 正常路徑，不可觸發未預期 catch 二次 markJobFailed。
+- [x] **Task 4：regression carry-forward + 誠實（AC7）** — 不偽綠：`regression-invariants.test.ts` REAL #5564 `it.todo` anchor **完全不動**；1.6 不宣稱任何真 #5564 端到端結果（仍 gated W-1-4-1/W-CR-5）；結構分類器證明在 `structureGuard.test.ts`（synthetic fixture 明標非 OCR）。
+- [x] **Task 5：驗收自查（AC7, AC8）** — `pnpm typecheck`(0)/`lint`(0)/`test`（既有零回歸 + 新 structureGuard 具名測 + parseWorker 型別綠）/`build`(綠)；靜態掃描：`src/lib/llm/**` 零改動、既有表/schema 無結構改動（無 migration）、無新 npm 相依、結構分類不在 route handler、拒絕路徑零寫列。記 Completion Notes 貼閘門證據。
 
 ## Dev Notes
 
@@ -94,12 +94,30 @@ so that 我不會被靜默誤算出一筆錯誤的分帳（FR7，v1 硬鎖）。
 
 ### Agent Model Used
 
-（dev-story 時填入）
+claude-opus-4-7[1m]
 
 ### Debug Log References
 
+- `TAX_RE` 刻意**不**匹配單字 `稅`/`税`（只匹配精確多字稅詞 營業稅/消費税/加值稅/增值税/銷售稅/[税稅]額 + latin TAX/VAT/GST）：真 #5564 footer 可能帶單 `稅` 字，誤拒「必須接受的那張」比漏拒更糟；footer 精準度調校 gated W-1-4-1（無 live parse 不可臆測 1.4 是否把 footer emit 成 ReceiptLine）。誠實標記、不臆測。
+- `FOREIGN_CURRENCY_RE` 排除 `NT$`/`TWD`/裸 `$`（#5564 印 NT$），只匹配明確外幣碼/符號（USD/US$/JPY/¥/EUR/€/GBP/£/CNY/RMB/HKD/HK$/KRW/₩）。
+- 母碼樣式單一真實來源：`export const PARENT_CODE_RE` 自 `src/features/parsing/irc.ts`（僅新增匯出、零演算法改動），structureGuard import 同一 regex（無 `g` flag → `.test` 無狀態安全），避免兩套規則漂移。
+
 ### Completion Notes List
+
+- **Task 1（AC1-AC3/AC7）**：`src/features/parsing/structureGuard.ts` 純 `classifyReceiptStructure(parsed): {ok:true}|{ok:false;reason}`，零 IO/零 float。fail-closed：空收據／無法正向確認 → reject。決定性優先序 tax > currency > no_product_code > structural（degenerate 空收據先 gate 為 structural_inconsistency，不誤落其他 reason）。`structureGuard.test.ts` 11 具名 node 測：synthetic #5564（**明標非 OCR**）→ ok:true；獨立稅行（CJK 營業稅 + latin TAX/VAT/GST）、外幣（含 NT$/TWD 不誤判）、無母碼、全負/空 → 各對應 reason；多頁串接稅行在後段頁仍判出（AC3/CIP）；優先序固定斷言。
+- **Task 2（AC5）**：`schema.ts` 新增具名匯出 `STRUCTURE_REJECT_MESSAGE`（單一友善繁中文案，NFR-R1 零系統細節，內部 reason 不外洩），置於既有 `MAX_PARSE_PAGES`/`friendlyJobMessage` 友善常數區（單一真實來源，無表/schema 結構改動）。
+- **Task 3（AC4/AC6/AC8）**：`parseWorker.ts` 成功路徑 `outcome.kind==="parsed"` → `output=outcome.receipt`（W-1-4-3 診斷不變）→ **先** `classifyReceiptStructure`；`!ok` → 結構化 log `reason`（僅 server）+ `markJobFailed(STRUCTURE_REJECT_MESSAGE)`（best-effort `.catch`，比照既有失敗分支）+ `continue`（**正常控制流分支非 throw**，不寫 receipt_lines、不落未預期 catch、終態 failed→NFR-R2 不死鎖）；`ok` → 維持 1.5 既有 try（persisted-flag/終態守衛/degraded 語意全不破壞，AC6 degraded 不豁免結構檢查）。
+- **Task 4（AC7）**：`regression-invariants.test.ts` **完全未改**（git 確認零 diff）——REAL #5564 `it.todo` anchor 原封；1.6 不宣稱任何真 #5564 端到端，仍誠實 gated W-1-4-1/W-CR-5；分類證明在 synthetic-only 的 `structureGuard.test.ts`。
+- **Task 5（AC7/AC8）閘門證據**：`pnpm typecheck` 0；`pnpm lint` 0；`pnpm test` 9 files / **93 passed | 2 todo**（既有 82 零回歸 + 新 11 structureGuard）；`pnpm build` 綠 5 routes。靜態掃描：`src/lib/llm/**` 零改動（唯一 Claude 邊界不繞過）、`src/db/schema.ts`+`drizzle/migrations/*` 零改動（**無 migration**，拒絕零寫列）、零新增 npm 相依、結構分類在 worker 非 route handler、純函式無網路。
 
 ### Change Log
 
+- 2026-05-20 — Story 1.6 dev-story 完成（Task 0-5）。新增純結構分類器（fail-closed FR7）+ 友善訊息常數 + parseWorker 拒絕閘門（正常分支非 throw）；母碼 regex 單一真實來源（irc.ts 匯出）。零 migration / 零新 npm / visionAdapter 零改動。閘門全綠（typecheck/lint/test 93pass2todo/build）。Status → review。
+
 ### File List
+
+- NEW `src/features/parsing/structureGuard.ts` — 純 #5564 結構分類器（fail-closed）
+- NEW `src/features/parsing/structureGuard.test.ts` — node 具名測（含明標 synthetic #5564 fixture）
+- MODIFIED `src/features/parsing/irc.ts` — `PARENT_CODE_RE` 改為 `export`（僅新增匯出，IRC 演算法零改動；母碼單一真實來源）
+- MODIFIED `src/features/parsing/schema.ts` — +`STRUCTURE_REJECT_MESSAGE` 具名常數（無表/schema 結構改動）
+- MODIFIED `src/workers/parseWorker.ts` — 成功路徑插結構拒絕閘門（正常分支 `continue`，1.5 try/persisted-flag/終態守衛不破壞）

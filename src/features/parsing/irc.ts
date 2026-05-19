@@ -39,8 +39,14 @@ export interface AttributedReceipt {
 
 /** `#<digits>` reference inside an IRC line → the PARENT's product code. */
 const IRC_REF_RE = /#\s*(\d{3,})/;
-/** Leading product code of an ordinary line (#5564: "8517238 1x 16.50"). */
-const PARENT_CODE_RE = /(?:^|\s)(\d{3,})\b/;
+/**
+ * Leading product code of an ordinary line (#5564: "8517238 1x 16.50").
+ * Exported so Story 1.6's structure guard matches "is this a #5564-style
+ * product-code line?" with the SAME rule — one source of truth, no
+ * two-regex drift. No `g` flag → safe to share (`.match`/`.test` don't
+ * mutate). Read-only consumer; the IRC algorithm is unchanged.
+ */
+export const PARENT_CODE_RE = /(?:^|\s)(\d{3,})\b/;
 
 function isIrcLine(l: ReceiptLine): boolean {
   return l.amountCents < 0;
