@@ -56,7 +56,7 @@
 #   each story states its own Drizzle schema DDL.
 
 generated: 2026-05-19
-last_updated: 2026-05-20T04:12
+last_updated: 2026-05-20T04:16
 project: splitting_tools
 project_key: NOKEY
 tracking_system: file-system
@@ -70,7 +70,7 @@ development_status:
   1-2b-multi-page-capture: done  # CIP 2026-05-19: 多頁長收據拉進 v1（插於 1-2 後、1-3 前，順序不倒置）
   1-3-async-parse-job-polling: done  # W-1-1-1 RESOLVED 2026-05-20; dev unblocked
   1-4-vision-llm-parse: done  # dev+review 2026-05-20
-  1-5-irc-match-parsed-sum: backlog
+  1-5-irc-match-parsed-sum: ready-for-dev  # spec created 2026-05-20 (owns receipt_lines + W-1-4-3)
   1-6-receipt-structure-reject: backlog
   1-7-parse-endpoint-budget: backlog
   epic-1-retrospective: optional
