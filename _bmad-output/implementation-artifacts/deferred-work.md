@@ -31,7 +31,18 @@
 
 ## W-1-2-1 — Story 1.2 manual browser verification (camera/HEIC/drag)
 
-- **Status:** OPEN
+- **Status:** RESOLVED (2026-05-19, by on-device test on real iOS
+  Safari) — core manual path PASSED (capture entry → native chooser →
+  library upload → compress ~482KB → draw mask → card masked → gate
+  enables → ready). Two sub-items honestly marked **manual N/A**,
+  covered by code/unit instead: (1) out-of-bounds-drag → gate stays
+  disabled — iOS touch can't drag finger off-element, protection by P2
+  fix (store clamped rect, gate on clamped) + `geometry.test.ts`
+  zero-area-when-outside test; (2) decode-error friendly message — iOS
+  Safari decodes HEIC natively and `accept="image/*"` blocks non-image
+  picks, so the path is near-untriggerable on iOS by normal use; trivial
+  typed-error→friendlyError mapping covered at code level. Detail in
+  `1-2-capture-compress-mask.md#On-device 驗證結果`.
 - **Priority:** P1
 - **Story:** 1-2-capture-compress-mask (AC1/AC3/AC6)
 - **Gap:** Canvas/pointer interactions cannot be auto-tested in the node
@@ -150,5 +161,8 @@
 
 ## Resolved
 
-_(none yet — entries move here with a `RESOLVED (date, by story/commit)`
-line and a one-line resolution summary; never deleted.)_
+- **W-1-2-1** — RESOLVED 2026-05-19 (on-device iOS Safari test): Story
+  1.2 capture/compress/mask core manual path passed on a real device;
+  out-of-bounds-gate & decode-error sub-items honestly reclassified as
+  manual-N/A, covered by P2 fix + node tests / code-level mapping. Full
+  entry kept above with RESOLVED status.

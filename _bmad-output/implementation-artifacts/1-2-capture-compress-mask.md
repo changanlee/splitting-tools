@@ -190,4 +190,15 @@ claude-opus-4-7[1m]（dev-story，2026-05-19）
 - [x] [Review][Patch] **on-device 驗證發現（2026-05-19，使用者實機）**：
   - (a) 首頁渲染但「拍收據」點了沒反應 → 根因 Next 16 dev 阻擋 LAN 來源 `/_next/*`（cross-origin 安全預設），client bundle 未載入→未 hydrate→onClick 沒掛。修：`next.config.ts` 加 `allowedDevOrigins`（dev-only，prod 無影響）。
   - (b) 連帶修 iOS WebKit 雷：file input 由 `hidden`(display:none) 改 `sr-only`——iOS Safari 對 display:none input 的 `.click()` 會被忽略。
-- 狀態：所有 patch 已修並通過閘門（lint/typecheck/test 23 pass+2 todo/build），維持 `done`；on-device 互動驗證進行中（W-1-2-1）。
+- 狀態：所有 patch 已修並通過閘門（lint/typecheck/test 23 pass+2 todo/build），維持 `done`。
+
+## On-device 驗證結果（W-1-2-1，2026-05-19，使用者實機 iOS Safari）
+
+**✅ 手動實證通過（截圖為證）：** 擷取入口點擊有反應 → iOS 原生選單（拍照/相簿/檔案）→ 從相簿上傳 → 前端壓縮（真實 Costco #5564，輸出 ~482KB < 500KB，AC2）→ 拖拉畫遮罩框 → 卡號（MB 89501062600）實際蓋住 → 閘門 `下一步` 正確由灰轉亮 → ready 畫面。AC1/AC2/AC3/AC7/AC8 行動路徑實機 OK。
+
+**⚠️ 非手動可測、改由 code/unit 覆蓋（誠實標記，未假裝測過）：**
+
+- **出界框→閘門維持灰（NFR-S3）**：iOS 觸控手指移出元素即斷追蹤，「拖到圖外」手勢人為無法可靠重現。保護由 **P2 修正**保證：`onPointerUp` 存 `clampMaskRect(draft,imgW,imgH)` 且僅 clamp 後面積>0 才存，閘門跑在已 clamp rects；`geometry.test.ts` 具名測試 `returns a zero-area rect when fully outside the image` 證出界=零面積=不存=灰。判定：邏輯恆成立、單元覆蓋，**manual N/A**。
+- **解碼錯誤友善訊息（AC6）**：iOS Safari 原生可解 HEIC（非失敗源），且 `accept="image/*"` 在相簿選不到非圖片檔 → 此路徑在 iOS 正常操作幾乎不可觸發。`ImageDecodeError`→friendlyError 為 trivial 映射，code-level 已覆蓋。判定：iOS 正常操作 **manual N/A by platform**，原 Test B 設計失誤已撤。
+
+**結論：** W-1-2-1 核心手動路徑通過；兩子項以 code/unit 覆蓋並誠實標記。`deferred-work.md#W-1-2-1` → RESOLVED。
