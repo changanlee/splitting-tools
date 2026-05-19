@@ -63,8 +63,22 @@ export function clampMaskRect(
 ): Rect {
   assertPositiveFinite(imgWidth, imgHeight);
 
-  // Normalize inverted drags (negative width/height) to a top-left origin.
   let { x, y, width, height } = rect;
+
+  // A non-finite drag (NaN / Infinity from a degenerate pointer event) can
+  // never be a trustworthy mask. Collapse it to zero area so the AC3 gate
+  // and the burn step treat it as "no mask applied" instead of silently
+  // painting nothing while the UI looks like the card was covered (NFR-S3).
+  if (
+    !Number.isFinite(x) ||
+    !Number.isFinite(y) ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height)
+  ) {
+    return { x: 0, y: 0, width: 0, height: 0 };
+  }
+
+  // Normalize inverted drags (negative width/height) to a top-left origin.
   if (width < 0) {
     x += width;
     width = -width;
@@ -74,10 +88,15 @@ export function clampMaskRect(
     height = -height;
   }
 
-  const left = Math.round(Math.min(Math.max(x, 0), imgWidth));
-  const top = Math.round(Math.min(Math.max(y, 0), imgHeight));
-  const right = Math.round(Math.min(Math.max(x + width, 0), imgWidth));
-  const bottom = Math.round(Math.min(Math.max(y + height, 0), imgHeight));
+  // Round OUTWARD: floor the near edges, ceil the far edges. Rounding can
+  // then only ever enlarge the mask by <1px and never erode a deliberately
+  // tight selection below the card digits — the privacy-safe direction
+  // (NFR-S3). Bounds are clamped to [0,img] BEFORE rounding so the result
+  // still cannot paint outside the image (AC4).
+  const left = Math.floor(Math.min(Math.max(x, 0), imgWidth));
+  const top = Math.floor(Math.min(Math.max(y, 0), imgHeight));
+  const right = Math.ceil(Math.min(Math.max(x + width, 0), imgWidth));
+  const bottom = Math.ceil(Math.min(Math.max(y + height, 0), imgHeight));
 
   return {
     x: left,

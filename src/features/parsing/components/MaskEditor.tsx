@@ -14,7 +14,11 @@ import { LockIcon, XIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { hasUsableMaskOrSkip, type Rect } from "@/lib/image/geometry";
+import {
+  clampMaskRect,
+  hasUsableMaskOrSkip,
+  type Rect,
+} from "@/lib/image/geometry";
 
 interface MaskEditorProps {
   /** Compressed, UNMASKED, display-only canvas. Never exported as-is. */
@@ -34,6 +38,8 @@ export function MaskEditor({
   const [draft, setDraft] = useState<Rect | null>(null);
   const [skip, setSkip] = useState(false);
   const startRef = useRef<{ x: number; y: number } | null>(null);
+  // Only ONE pointer drives a drag; a second touch must not hijack it.
+  const activePointer = useRef<number | null>(null);
 
   const imgW = sourceCanvas.width;
   const imgH = sourceCanvas.height;
@@ -49,9 +55,12 @@ export function MaskEditor({
   }, [sourceCanvas, imgW, imgH]);
 
   const toImageCoords = useCallback(
-    (clientX: number, clientY: number) => {
+    (clientX: number, clientY: number): { x: number; y: number } | null => {
       const box = displayRef.current?.getBoundingClientRect();
-      if (!box || box.width === 0 || box.height === 0) return { x: 0, y: 0 };
+      // Canvas not laid out yet (reflow / display:none mid-transition):
+      // return null so callers can ABORT instead of silently snapping the
+      // mask to the (0,0) origin over the wrong region (NFR-S3).
+      if (!box || box.width === 0 || box.height === 0) return null;
       return {
         x: ((clientX - box.left) / box.width) * imgW,
         y: ((clientY - box.top) / box.height) * imgH,
@@ -60,17 +69,29 @@ export function MaskEditor({
     [imgW, imgH],
   );
 
+  const endDrag = useCallback(() => {
+    setDraft(null);
+    startRef.current = null;
+    activePointer.current = null;
+  }, []);
+
   const onPointerDown = (e: React.PointerEvent) => {
     if (skip) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
+    if (activePointer.current !== null) return; // ignore secondary touches
     const p = toImageCoords(e.clientX, e.clientY);
+    if (!p) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    activePointer.current = e.pointerId;
     startRef.current = p;
     setDraft({ x: p.x, y: p.y, width: 0, height: 0 });
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
-    if (skip || !startRef.current) return;
+    if (skip || e.pointerId !== activePointer.current || !startRef.current) {
+      return;
+    }
     const p = toImageCoords(e.clientX, e.clientY);
+    if (!p) return;
     const s = startRef.current;
     setDraft({
       x: Math.min(s.x, p.x),
@@ -80,12 +101,26 @@ export function MaskEditor({
     });
   };
 
-  const onPointerUp = () => {
-    if (draft && draft.width > 4 && draft.height > 4) {
-      setRects((prev) => [...prev, draft]);
+  const onPointerUp = (e: React.PointerEvent) => {
+    if (e.pointerId !== activePointer.current) return;
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+    if (draft) {
+      // Authoritative gate is the CLAMPED rect. A drag landing fully
+      // outside the image collapses to zero area and must NOT be stored,
+      // or `hasUsableMaskOrSkip` would let the card ship unmasked
+      // (NFR-S3). Store the clamped, in-bounds rect — never the raw draft.
+      const clamped = clampMaskRect(draft, imgW, imgH);
+      if (clamped.width > 0 && clamped.height > 0) {
+        setRects((prev) => [...prev, clamped]);
+      }
     }
-    setDraft(null);
-    startRef.current = null;
+    endDrag();
+  };
+
+  const onPointerCancel = (e: React.PointerEvent) => {
+    if (e.pointerId !== activePointer.current) return;
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
+    endDrag(); // gesture interrupted — never keep a stale half-drawn draft
   };
 
   const removeRect = (idx: number) =>
@@ -120,6 +155,8 @@ export function MaskEditor({
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
+          onPointerCancel={onPointerCancel}
+          onLostPointerCapture={endDrag}
           aria-label="收據預覽，拖拉以遮蔽會員卡號"
         />
         {boxes.map((r, i) => (

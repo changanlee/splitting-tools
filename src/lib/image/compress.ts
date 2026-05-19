@@ -56,6 +56,14 @@ export async function compressToCanvas(
   }
 
   try {
+    // Some browsers (notably older iOS Safari with HEIC) resolve
+    // createImageBitmap with a 0x0 bitmap instead of rejecting. Treat that
+    // as a decode failure so the user gets the accurate "can't open this
+    // image" guidance rather than a generic, misleading "try again".
+    if (!bitmap.width || !bitmap.height) {
+      throw new ImageDecodeError("decoded image has zero dimensions");
+    }
+
     const { width, height } = computeResizedDimensions(
       bitmap.width,
       bitmap.height,
@@ -66,8 +74,12 @@ export async function compressToCanvas(
     canvas.width = width;
     canvas.height = height;
 
+    // A missing 2D context is an environment/setup failure (e.g. canvas
+    // too large for device memory), not an encode failure. Surface it as a
+    // decode error so the friendly message advises a different/smaller
+    // photo instead of a futile "retry" of the same file.
     const ctx = canvas.getContext("2d");
-    if (!ctx) throw new ImageEncodeError("2d context unavailable");
+    if (!ctx) throw new ImageDecodeError("2d context unavailable");
     ctx.drawImage(bitmap, 0, 0, width, height);
 
     return { canvas, width, height };
@@ -86,10 +98,25 @@ export async function compressToCanvas(
 export function canvasToJpegBlob(
   canvas: HTMLCanvasElement,
   quality = 0.8,
+  timeoutMs = 15_000,
 ): Promise<Blob> {
   return new Promise((resolve, reject) => {
+    // `toBlob` is known to never invoke its callback on some mobile
+    // WebViews with large canvases. Without this timeout the whole capture
+    // flow would hang forever with no error path; the race guarantees the
+    // promise always settles so the UI can show a friendly retry (AC6).
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new ImageEncodeError("toBlob timed out"));
+    }, timeoutMs);
+
     canvas.toBlob(
       (blob) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
         if (blob) resolve(blob);
         else reject(new ImageEncodeError("toBlob returned null"));
       },

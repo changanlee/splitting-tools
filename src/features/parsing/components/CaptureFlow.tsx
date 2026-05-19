@@ -60,6 +60,11 @@ export function CaptureFlow() {
   const onConfirmMask = async (rects: Rect[], skipConfirmed: boolean) => {
     if (phase.k !== "editing") return;
     const canvas = phase.canvas;
+    // Lock SYNCHRONOUSLY before the async burn/encode. This unmounts the
+    // editor and makes a second tap of "下一步" hit the guard above, so
+    // `applyMaskAndEncode` (a destructive in-place burn) can never run
+    // twice on the same canvas or race a concurrent edit.
+    setPhase({ k: "compressing" });
     try {
       // Burns the mask irreversibly, then encodes. `skipConfirmed` => no
       // rects (payer attested there is no card number); the image is still

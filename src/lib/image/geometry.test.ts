@@ -70,10 +70,34 @@ describe("clampMaskRect (AC3/AC4: normalize + clamp mask rect to image bounds)",
     );
   });
 
-  it("rounds fractional coordinates to integer pixels", () => {
+  it("rounds OUTWARD so the mask never shrinks below the selection (privacy-safe)", () => {
+    // x=10.6 -> floor 10 ; right=41.0 -> ceil 41 ; width 31 (>= the
+    // selected 30.4, never less). y=20.2 -> floor 20 ; bottom=61.1 ->
+    // ceil 62 ; height 42. Rounding only ever covers MORE of the card.
     expect(
       clampMaskRect({ x: 10.6, y: 20.2, width: 30.4, height: 40.9 }, 200, 200),
-    ).toEqual({ x: 11, y: 20, width: 30, height: 41 });
+    ).toEqual({ x: 10, y: 20, width: 31, height: 42 });
+  });
+
+  it("never erodes a sub-pixel-thin mask to zero (defeats the privacy intent)", () => {
+    const r = clampMaskRect({ x: 10.6, y: 5, width: 0.4, height: 20 }, 200, 200);
+    // Math.round would give left=11,right=11 -> width 0 (card exposed).
+    // Outward rounding keeps a >=1px cover.
+    expect(r.width).toBeGreaterThanOrEqual(1);
+    expect(r.height).toBeGreaterThanOrEqual(20);
+  });
+
+  it("collapses a non-finite (NaN/Infinity) rect to zero area", () => {
+    expect(
+      clampMaskRect({ x: Number.NaN, y: 0, width: 10, height: 10 }, 200, 200),
+    ).toEqual({ x: 0, y: 0, width: 0, height: 0 });
+    expect(
+      clampMaskRect(
+        { x: 0, y: 0, width: Number.POSITIVE_INFINITY, height: 10 },
+        200,
+        200,
+      ),
+    ).toEqual({ x: 0, y: 0, width: 0, height: 0 });
   });
 
   it("normalizes a rect dragged up-left (negative width/height)", () => {
