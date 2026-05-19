@@ -1,6 +1,6 @@
 # Story 1.3: 非阻塞解析提交與進度輪詢（多頁上傳契約）
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -31,15 +31,15 @@ so that 解析不阻塞我的操作、賣場弱網下也看得到進展，而不
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0：前置確認（硬門檻）** — 確認 `deferred-work.md#W-1-1-1` RESOLVED 且 Story 1.1 ≥ review；否則 HALT（dev-story 不得開始）。讀 Next 16 文件（AGENTS.md）：Route Handlers（`app/.../route.ts` 之 `POST`/`GET`、`Request`/`NextResponse`、`runtime`、`multipart/form-data` 解析）、`params` 為 Promise — 與訓練資料差異記 Debug Log。
-- [ ] **Task 1：Zod 契約源（AC4）** — `src/features/parsing/schema.ts`：`ParseSubmitResponse`（`{ jobId: string }`）、`ParseStatusResponse`（`{ status: 'queued'|'processing'|'succeeded'|'failed'|'degraded'; message?: string }`）、錯誤封套 schema；推導 TS 型別前後端共用。純函式可 node 測。
-- [ ] **Task 2：DB 寫入（沿用既有 schema，勿改表）（AC1, AC5）** — 用既有 `src/db/schema.ts` 之 `sessions`/`parse_jobs`（**不**新增/改表）；`src/features/parsing/server/` 建立 session + parse_job 列（`status='queued'`）；影像暫存策略（關聯 sessionId、可被 6.1 清除；本 story 不無界堆積、不入 log）。
-- [ ] **Task 3：pg-boss producer + budget seam（AC1, AC6）** — `src/features/parsing/server/`：job 入列（payload sessionId + 有序影像參照 + pageCount）；**不**寫消費者（1.4）。Budget gate seam：`checkParseBudget(sessionId): {ok:boolean}` 佔位純函式預設 `{ok:true}`（1.7 接 `rate_counters`）；入列前呼叫。
-- [ ] **Task 4：Route Handlers（AC1, AC2, AC4, AC5, AC9）** — 解析提交 `POST`（multipart，有序 N 已遮 part + pageCount；Zod 驗證；budget seam；建 session+job+enqueue；p95<1s 回 `{jobId}`）；job 狀態 `GET`（Zod 回應；唯讀 O(1)；友善 `message`，原始錯誤不外洩）。統一錯誤封套。**伺服器不 log 影像位元組**。
-- [ ] **Task 5：前端輪詢 + ParseProgress（AC3, AC9）** — 安裝 TanStack Query（先 `pnpm view @tanstack/react-query version` + minimumReleaseAge 檢查）；`src/features/parsing/hooks/useParseJobPolling`（2–3s + 閒置退避；終態停輪詢）；`ParseProgress` 元件（五狀態三重編碼、行動單欄、友善失敗+重試）。
-- [ ] **Task 6：CaptureFlow 串接（AC10）** — `ready` 階段「下一步：上傳」改為實際 POST `phase.blobs`（有序 multipart）→ 取 jobId → 顯示 `ParseProgress`。**不**破壞既有單頁/多頁/error 流程；未遮影像永不入請求（已由 1.2/1.2b 保證，AC5）。
-- [ ] **Task 7：LLM Compliance 分節落實（AC7）** — 於本檔 `## LLM Compliance` 逐項交代並在 code 對應處留 inherited 標記/seam；item 3 AC1/Task3 on-spec 證據；items 1/2/4/5 指向 Story 1.4；item 7 指向 Story 1.7 + 本 story seam。
-- [ ] **Task 8：驗收自查（AC8, AC10）** — `pnpm lint`(0) && `pnpm typecheck`(0) && `pnpm test`（既有 44+2 零回歸 + 新純邏輯具名測試）&& `pnpm build`（綠）；靜態掃描：未遮原圖零持久化/log；無繞過 visionAdapter；G2 order 未動；`package.json` 僅新增 Zod/TanStack（供應鏈已查）。整合 smoke（docker 環境，W 登記若無法自動化）。
+- [x] **Task 0：前置確認（硬門檻）** — W-1-1-1 RESOLVED + Story 1.1 done 已確認；讀 Next 16 Route Handlers 文件（`route.ts` `GET/POST(Request)`、**`ctx.params` 為 Promise**、預設不快取、Web `Request`/`formData()`），與訓練差異記 Debug Log；params 採顯式 `{ params: Promise<{...}> }`（typegen-independent）。
+- [x] **Task 1：Zod 契約源（AC4）** — `src/features/parsing/schema.ts`：`CreateSessionResponse`/`ParseSubmitResponse`/`ParseStatusResponse`/`ErrorEnvelope` + 純 `validateParseSubmit`/`friendlyJobMessage`/`isTerminalStatus`/`MAX_PARSE_PAGES`；`schema.test.ts` 11 具名 node 測（RED→GREEN）。
+- [x] **Task 2：DB 寫入（沿用既有 schema）（AC1, AC5）** — `server/jobs.ts`：`createSession`（randomUUID＝placeholder linkId，3.1 才定不可猜）/`createQueuedJob`/`markJobFailed`/`getJobStatus`（scoped by linkId, O(1)）；**未改 schema 表**；不 log 影像。
+- [x] **Task 3：pg-boss producer + budget seam（AC1, AC6）** — `server/queue.ts` lazy singleton producer（start+createQueue once，`enqueueParse`；payload sessionId+jobId+pageCount+base64 images+mime）；**無消費者/無 boss.work**（1.4）；`server/budget.ts` `checkParseBudget` 預設 pass + node 測（1.7 seam）。設計決策：影像走 pg-boss payload（單 Postgres、無改表、跨容器），物件儲存為 Phase-later（W-1-3-2）。
+- [x] **Task 4：Route Handlers（AC1,AC2,AC4,AC5,AC9）** — `POST /api/splits`（建 session→201 `{linkId}`）、`POST /api/splits/[linkId]/parse-jobs`（formData→`validateParseSubmit`→budget seam→createQueuedJob→enqueue→202 `{jobId}`；enqueue 失敗→markJobFailed+502 友善）、`GET .../[jobId]`（getJobStatus+friendlyJobMessage；free-text status 經 Zod safeParse 防衛→未知降 failed；404/502 友善封套）。架構明定 2-step（建 session 與上傳分離，解 chicken-egg）。
+- [x] **Task 5：輪詢 + ParseProgress（AC3, AC9）** — TanStack `@tanstack/react-query@5.100.10`（pin <24h 之前版避供應鏈擋）+ `app/providers.tsx`（QueryClientProvider，layout 掛載）；`hooks/useParseJobPolling`（2.5s、終態停、`refetchIntervalInBackground:false` 閒置退避、Zod 驗回應）；`components/ParseProgress`（五狀態 text+icon+語意色三重編碼、fetch 失敗友善+重試）。
+- [x] **Task 6：CaptureFlow 串接（AC10）** — `ready` 加「上傳並解析」→ `uploadAndParse`（POST /api/splits→linkId→multipart pages→jobId→`parsing` 顯示 ParseProgress）；新增 `uploading`/`parsing`/`uploadError`(保留已遮 blob 不必重拍) phase；既有單頁/多頁/editing/error 流程未破壞；只送已遮 blob（NFR-S3）。
+- [x] **Task 7：LLM Compliance（AC7）** — 本檔 `## LLM Compliance` 表已逐項交代；code：item3 on-spec（producer/<1s/worker）、items1/2/4/5 無 LLM 呼叫（queue.ts 僅 guard 註解指向 1.4）、item6 N/A（輪詢非 chat）、item7 budget seam（1.7）。
+- [x] **Task 8：驗收自查（AC8, AC10）** — `pnpm typecheck`(0)/`pnpm lint`(0 err,0 warn)/`pnpm test`(5 files,56 pass+2 todo,0 回歸)/`pnpm build`(綠;3 routes `ƒ Dynamic`) 全綠；靜態掃描：影像零 log、無 visionAdapter/消費者、`src/db/schema.ts` 未動、僅 +zod/+tanstack（供應鏈已查）。**修復**：`src/lib/db/client.ts` 改 lazy（next build「collect page data」import 路由→原 top-level throw 破 build；lazy 保留 fail-loud 契約，僅延到首次使用）。整合 runtime smoke（upload→enqueue→poll，p95<1s）→ `deferred-work#W-1-3-1`（P1，docker 整合，比照 W-1-2-1 不入 node）。
 
 ## Dev Notes
 
@@ -111,12 +111,42 @@ so that 解析不阻塞我的操作、賣場弱網下也看得到進展，而不
 
 ### Agent Model Used
 
-（dev-story 時填入）
+claude-opus-4-7[1m]（dev-story，2026-05-20）
 
 ### Debug Log References
 
+- Next 16 Route Handlers vs 訓練資料：`route.ts` 內 `export async function GET/POST(request: Request, ctx)`；**`ctx.params` 為 `Promise`**（`await ctx.params`）；預設**不快取**（POST 永不、GET 需顯式 opt-in，本 story 全動態）；用 Web `Request`/`request.formData()` 解 multipart；`Response.json()`。採顯式 `{ params: Promise<{...}> }` 而非 generated global `RouteContext`（typecheck 不依賴 typegen）。
+- 建置回歸（修復）：`next build` 之「collecting page data」會 import 每個 route module，`@/lib/db/client` 原 top-level `if(!DATABASE_URL) throw` 在無 env 的 build 觸發 → build 失敗。修：client 改 lazy（Proxy，首次存取才連線+檢查），fail-loud 契約不變（仍 throw，只是延到 request/worker 使用時，那時 env 在）。僅 `jobs.ts` import `db`，export 面（db/pool/schema）不變。
+- 供應鏈：`@tanstack/react-query@5.100.11` 發布 2026-05-18T19:47Z（<24h，會被 minimumReleaseAge 擋）→ pin `5.100.10`（2026-05-11，安全）；`zod@4.4.3`（2026-05-04，安全）。host `pnpm install --frozen-lockfile` exit 0。
+
 ### Completion Notes List
+
+- ✅ Tasks 0–8 全綠（見 Tasks 勾選）。Story 1.3 非阻塞解析提交＋輪詢＋多頁上傳契約落地。
+- 設計決策（documented，非 silent）：①影像走 pg-boss job payload base64（單 Postgres、無改 schema 表、跨容器 web→worker；MAX_PARSE_PAGES=5 上界；物件儲存＝Phase-later W-1-3-2）。②架構明定 2-step API（`POST /api/splits` 建 session ＋ `POST .../[linkId]/parse-jobs` 上傳），解 linkId chicken-egg；不可猜連結＝ Story 3.1（本 story 用 randomUUID placeholder，未 pre-empt）。③`client.ts` lazy 化（build 回歸修，契約不變，跨 story 修已記 Debug Log + commit）。
+- 📋 驗證協定回溯：**AC↔測試映射** — AC4（Zod/validate/friendly/terminal）→ `schema.test.ts` 11 + `budget.test.ts` 1 具名 node 測；AC1/AC2/AC3/AC5/AC9（Route Handler/pg-boss/DB/輪詢/UI 整合）＝整合層，依 AC8 不入 node（型別+build 驗證 + W-1-3-1 docker smoke）；AC10 → 靜態掃描 + 閘門全綠 + schema 未動。**LLM Compliance** — item3 ✅on-spec、1/2/4/5 ⏸1.4、6 N/A、7 ⏸1.7(seam)。**Deferred** — W-1-3-1（runtime 整合 smoke，P1）、W-1-3-2（影像移物件儲存，Phase-later）。
 
 ### Change Log
 
+- 2026-05-20：Story 1.3 實作完成。新增 parsing schema/server(jobs,queue,budget)/hooks/ParseProgress + 3 Route Handlers + providers；CaptureFlow 串接上傳→輪詢；+zod@4.4.3 +@tanstack/react-query@5.100.10（供應鏈已查）。修 `client.ts` lazy（build 回歸）。閘門全綠（typecheck/lint/test 56+2/build），Status review。
+
 ### File List
+
+> A=新增 M=改。本 story 改動。
+
+- `src/features/parsing/schema.ts`（A：Zod 契約 + 純 validator/mapper）
+- `src/features/parsing/schema.test.ts`（A：11 node 測）
+- `src/features/parsing/server/budget.ts`（A：1.7 budget seam）
+- `src/features/parsing/server/budget.test.ts`（A：1 node 測）
+- `src/features/parsing/server/queue.ts`（A：pg-boss producer singleton，含 ParseJobPayload）
+- `src/features/parsing/server/jobs.ts`（A：session/job/status Drizzle，沿用既有 schema）
+- `src/app/api/splits/route.ts`（A：POST 建 session）
+- `src/app/api/splits/[linkId]/parse-jobs/route.ts`（A：POST 多頁上傳+enqueue）
+- `src/app/api/splits/[linkId]/parse-jobs/[jobId]/route.ts`（A：GET 狀態）
+- `src/features/parsing/hooks/useParseJobPolling.ts`（A：TanStack 輪詢，終態停+閒置退避）
+- `src/features/parsing/components/ParseProgress.tsx`（A：五狀態三重編碼 UI）
+- `src/app/providers.tsx`（A：QueryClientProvider）
+- `src/app/layout.tsx`（M：掛載 Providers）
+- `src/features/parsing/components/CaptureFlow.tsx`（M：ready→上傳→parsing；新增 uploading/parsing/uploadError phase）
+- `src/lib/db/client.ts`（M：lazy 化修 next build 回歸；export 面/契約不變）
+- `package.json`（M：+zod@4.4.3 +@tanstack/react-query@5.100.10）
+- `_bmad-output/implementation-artifacts/{1-3-...md,sprint-status.yaml,deferred-work.md}`（M）

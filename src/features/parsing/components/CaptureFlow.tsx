@@ -20,6 +20,7 @@ import {
   AlertTriangleIcon,
   CameraIcon,
   CheckCircle2Icon,
+  Loader2Icon,
   PlusIcon,
 } from "lucide-react";
 
@@ -28,6 +29,11 @@ import { applyMaskAndEncode } from "@/lib/image/mask";
 import { compressToCanvas, ImageDecodeError } from "@/lib/image/compress";
 import { MaskEditor } from "@/features/parsing/components/MaskEditor";
 import { PageList } from "@/features/parsing/components/PageList";
+import { ParseProgress } from "@/features/parsing/components/ParseProgress";
+import {
+  CreateSessionResponseSchema,
+  ParseSubmitResponseSchema,
+} from "@/features/parsing/schema";
 import {
   addPage,
   allPagesDecided,
@@ -54,6 +60,9 @@ type Phase =
   | { k: "editing"; canvas: HTMLCanvasElement }
   | { k: "review" }
   | { k: "ready"; blobs: Blob[] }
+  | { k: "uploading" }
+  | { k: "parsing"; linkId: string; jobId: string }
+  | { k: "uploadError"; blobs: Blob[] } // keep masked pages on a net blip
   | { k: "error"; message: string };
 
 function friendlyError(err: unknown): string {
@@ -181,6 +190,36 @@ export function CaptureFlow() {
     setPhase({ k: "idle" });
   };
 
+  // Story 1.3: upload the ordered MASKED Blob[] (only artifact allowed
+  // to leave the device — NFR-S3; the unmasked originals never existed
+  // here) → create session → enqueue parse → poll. On a network blip we
+  // keep the masked pages so the payer needn't re-capture.
+  const uploadAndParse = async (blobs: Blob[]) => {
+    setPhase({ k: "uploading" });
+    try {
+      const sRes = await fetch("/api/splits", { method: "POST" });
+      if (!sRes.ok) throw new Error("session");
+      const { linkId } = CreateSessionResponseSchema.parse(
+        await sRes.json(),
+      );
+
+      const fd = new FormData();
+      fd.set("pageCount", String(blobs.length));
+      blobs.forEach((b, i) => fd.append("pages", b, `page-${i}.jpg`));
+
+      const pRes = await fetch(
+        `/api/splits/${encodeURIComponent(linkId)}/parse-jobs`,
+        { method: "POST", body: fd },
+      );
+      if (!pRes.ok) throw new Error("submit");
+      const { jobId } = ParseSubmitResponseSchema.parse(await pRes.json());
+
+      setPhase({ k: "parsing", linkId, jobId });
+    } catch {
+      setPhase({ k: "uploadError", blobs });
+    }
+  };
+
   const totalKb =
     phase.k === "ready"
       ? Math.round(
@@ -293,10 +332,55 @@ export function CaptureFlow() {
           <Button
             type="button"
             className="h-12 w-full"
-            disabled
-            title="上傳於 Story 1.3 實作"
+            onClick={() => uploadAndParse(phase.blobs)}
           >
-            下一步：上傳（即將推出）
+            上傳並解析
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-12 w-full"
+            onClick={resetAll}
+          >
+            全部重拍
+          </Button>
+        </div>
+      )}
+
+      {phase.k === "uploading" && (
+        <p
+          className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground"
+          role="status"
+          aria-live="polite"
+        >
+          <Loader2Icon className="size-5 shrink-0 animate-spin" aria-hidden />
+          上傳中…
+        </p>
+      )}
+
+      {phase.k === "parsing" && (
+        <ParseProgress
+          linkId={phase.linkId}
+          jobId={phase.jobId}
+          onRetry={resetAll}
+        />
+      )}
+
+      {phase.k === "uploadError" && (
+        <div className="flex flex-col gap-4">
+          <p
+            className="flex items-center gap-2 text-sm font-medium text-destructive"
+            role="alert"
+          >
+            <AlertTriangleIcon className="size-5 shrink-0" aria-hidden />
+            上傳失敗，請檢查網路後重試（已遮影像仍保留，不必重拍）。
+          </p>
+          <Button
+            type="button"
+            className="h-12 w-full"
+            onClick={() => uploadAndParse(phase.blobs)}
+          >
+            重新上傳（{phase.blobs.length} 頁）
           </Button>
           <Button
             type="button"

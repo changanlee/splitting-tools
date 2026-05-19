@@ -180,6 +180,47 @@
 
 ---
 
+## W-1-3-1 — Story 1.3 runtime integration smoke (upload→enqueue→poll)
+
+- **Status:** OPEN
+- **Priority:** P1
+- **Story:** 1-3-async-parse-job-polling (AC1/AC2/AC3/AC5)
+- **Gap:** Route Handler ↔ pg-boss ↔ Postgres integration is not
+  node-tested (AC8 strategy; same precedent as W-1-2-1/W-1-2b-1). Pure
+  logic (Zod/validate/budget/status-map) IS node-tested (12 tests);
+  typecheck+build green. Un-verified at runtime: `POST /api/splits`
+  → `POST .../parse-jobs` (multipart, p95<1s `{jobId}`) → pg-boss job
+  actually enqueued → `GET .../[jobId]` returns status → poll stops at
+  terminal; enqueue-failure → markJobFailed terminal path.
+- **Reason for defer:** needs the docker stack up + an end-to-end
+  exercise; heavy to automate inside the autonomous loop.
+- **Trigger / resolve when:** `WEB_PORT=3010 DB_PORT=55470 docker
+  compose up -d --build`, then curl the 3 endpoints (create session →
+  multipart submit a small JPEG → poll). Confirm jobId <1s, a
+  `pgboss`-schema job row exists, status endpoint friendly-only.
+  Record in `1-3-...md` Debug Log, close here. (Note: no consumer yet
+  — job stays `queued`/in pg-boss until Story 1.4; that is expected.)
+- **Tracked in:** `1-3-async-parse-job-polling.md` Completion Notes.
+
+## W-1-3-2 — Move parse images out of the pg-boss payload at scale
+
+- **Status:** OPEN
+- **Priority:** Phase-later
+- **Story:** infra / scale-stage (revisit when DAU or receipt volume
+  grows, or pages cap raised)
+- **Gap:** Story 1.3 carries masked page images as base64 inside the
+  pg-boss job payload (single-Postgres, no schema change, cross-
+  container — correct & minimal now; bounded by MAX_PARSE_PAGES=5
+  ≈ ~3MB/job). At scale this bloats the queue table / WAL.
+- **Reason for defer:** premature object storage = the
+  "為萬一爆紅過度設計" anti-pattern; the architecture mandates single
+  Postgres at DAU<10k stage-0.
+- **Trigger / resolve when:** before raising the page cap materially
+  OR at the 10k–50k scale stage — move blobs to object storage /
+  shared volume, payload carries only references.
+
+---
+
 ## Deferred from: CIP — multi-page receipt (2026-05-19)
 
 > Source: `docs/PRD-multi-page-receipt-roadmap.md`. Multi-page pulled
