@@ -27,6 +27,8 @@ import {
   markJobStatus,
 } from "@/features/parsing/server/jobs";
 import { parseReceiptImages } from "@/lib/llm/visionAdapter";
+import { attributeIrc } from "@/features/parsing/irc";
+import { persistReceiptLines } from "@/features/parsing/server/persistReceiptLines";
 
 const FRIENDLY_UNEXPECTED =
   "收據解析暫時失敗，請稍後再試一次。";
@@ -54,18 +56,26 @@ export async function registerParseWorker(boss: PgBoss): Promise<void> {
             { sessionId: data.sessionId, jobId: data.jobId },
           );
           if (outcome.kind === "parsed") {
-            // Guard the TERMINAL write: a DB blip here must NOT rethrow
-            // (pg-boss would re-run the whole Claude parse — the design
-            // explicitly avoids that) and must still leave a terminal
-            // state (NFR-R2 — payer never deadlocked).
+            // Story 1.5: IRC attribution + receipt_lines persistence in
+            // the SAME success path (W-1-4-3 hand-off; no cross-process
+            // pg-boss-output read). Guard the WHOLE terminal block: a
+            // DB blip must NOT rethrow (pg-boss would re-run the whole
+            // Claude parse — explicitly avoided) and must still leave a
+            // terminal state (NFR-R2 — payer never deadlocked).
             try {
+              const attributed = attributeIrc(outcome.receipt);
+              await persistReceiptLines(
+                data.jobId,
+                data.sessionId,
+                attributed,
+              );
               await markJobStatus(
                 data.jobId,
                 outcome.degraded ? "degraded" : "succeeded",
               );
             } catch (e) {
               console.error(
-                "[parseWorker] terminal markJobStatus failed:",
+                "[parseWorker] IRC persist / terminal write failed:",
                 e instanceof Error ? e.message : String(e),
               );
               await markJobFailed(data.jobId, FRIENDLY_UNEXPECTED).catch(

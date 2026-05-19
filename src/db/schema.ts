@@ -110,3 +110,48 @@ export const rateCounters = pgTable("rate_counters", {
   windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
   count: integer("count").notNull().default(0),
 });
+
+/**
+ * Parsed + IRC-attributed receipt lines (Story 1.5 — THE owner of this
+ * table; 1.3/1.4 were forbidden from schema changes, 1.5 adds it).
+ *
+ * Money is integer cents (money guardrail; IRC lines are negative).
+ * `irc_attributed_to` is a SELF reference to the parent's `id` — kept
+ * as a plain column (no hard FK) so insert order can't deadlock a
+ * self-cycle; the IRC algorithm guarantees referential validity.
+ */
+export const receiptLines = pgTable(
+  "receipt_lines",
+  {
+    id: text("id").primaryKey(),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => sessions.id),
+    parseJobId: text("parse_job_id")
+      .notNull()
+      .references(() => parseJobs.id),
+    // Receipt top→bottom order (cross-page already concatenated, 1.2b).
+    lineNo: integer("line_no").notNull(),
+    description: text("description").notNull(),
+    rawText: text("raw_text"),
+    qty: integer("qty").notNull(),
+    // Original line amount; IRC discount lines are negative.
+    grossCents: integer("gross_cents").notNull(),
+    // Parent = gross + Σ(its IRC); normal = gross; IRC = own amount.
+    netCents: integer("net_cents").notNull(),
+    isIrc: boolean("is_irc").notNull().default(false),
+    // IRC lines are never independently claimable (FR6).
+    claimable: boolean("claimable").notNull().default(true),
+    // IRC line → parent receipt_lines.id; else null (self-ref, no FK).
+    ircAttributedTo: text("irc_attributed_to"),
+    // IRC with no matching parent — kept for Epic 2 re-bind, not lost.
+    orphan: boolean("orphan").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("idx_receipt_lines_job").on(t.parseJobId),
+    index("idx_receipt_lines_session").on(t.sessionId),
+  ],
+);

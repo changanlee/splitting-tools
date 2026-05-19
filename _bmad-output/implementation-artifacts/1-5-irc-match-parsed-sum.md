@@ -1,6 +1,6 @@
 # Story 1.5: IRC 折扣自動配對母品項與 parsed_sum 計算
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -33,12 +33,12 @@ so that 後續分帳/結算的每行金額正確（FR6；FR50 前置資料基礎
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0：前置** — 確認 1-4 done（`ParsedReceipt`/parseWorker/pg-boss output 在）；讀 `1-4-vision-llm-parse.md`（ReceiptLine 形狀、pg-boss job output hand-off、W-1-4-3）、`architecture.md` L330-331/L345/L396-398、`src/db/schema.ts`（既有 4 表 + drizzle 慣例）、`src/workers/parseWorker.ts`（成功路徑接點）。AGENTS.md：本 story 無新 Next/SDK API，記 Debug Log 即可。
-- [ ] **Task 1：IRC 純演算法（AC1-AC4, AC7, AC8）** — `src/features/parsing/irc.ts`：`attributeIrc(parsed: ParsedReceipt): AttributedReceipt`（純）——辨識 IRC 行（amountCents<0 且 rawText/description 含母碼樣式）、抽母碼、配對母行、算 net_cents、標 is_irc/claimable/irc_attributed_to/orphan；`computeParsedSum(attributed): number`（Σ，整數分，守恆）。型別 `AttributedLine`/`AttributedReceipt`（`z.infer` 對齊或明確 interface）。`irc.test.ts` 具名 node 測：單 IRC 折抵、多筆 IRC 同母累加、孤兒 IRC(orphan,計入,不丟)、無母行、全 IRC、零 IRC（恆等）、整數分無 float、守恆不變量（Σnet+孤兒 == Σ原始 amount）、跨頁順序打亂結果相同、合成「#5564 結構契約」→ 220850。
-- [ ] **Task 2：receipt_lines schema + migration（AC5, AC8, AC9）** — `src/db/schema.ts` 新增 `receiptLines` pgTable（DDL 見 Dev Notes，整數分欄、self-FK irc_attributed_to nullable、line_no 保序、session/parse_job 關聯 + index）；`pnpm db:generate` 產 `drizzle/migrations/000X_*.sql`，逐欄比對 DDL 規格；確認**僅新增表**、不改既有 4 表；G2 序（migrate→pg-boss start）既有 `src/workers/index.ts` 不動即成立。
-- [ ] **Task 3：持久化 + parseWorker 接線（AC6, AC9）** — `src/features/parsing/server/`：`persistAttributedReceipt(jobId, sessionId, attributed)`（寫 receipt_lines 多列，整數分；冪等：同 job 重入先清再寫或 upsert，避免重複——比照終態守衛精神）；`src/workers/parseWorker.ts` 成功路徑：visionAdapter `parsed` → `attributeIrc` → `persistAttributedReceipt` → parsed_sum（receipt_lines 聚合或既有欄，spec 述選擇）→ markJobStatus succeeded/degraded（既有，不破壞 NFR-R2/終態守衛）。失敗/降級不寫 receipt_lines。`deferred-work#W-1-4-3` RESOLVED。
-- [ ] **Task 4：regression carry-forward（AC7）** — 不偽綠：`regression-invariants.test.ts` REAL #5564 `it.todo` 保留 anchor（更新註記指向本 story 已實作演算法、真資料仍 gated W-1-4-1/W-CR-5）；演算法證明在 `irc.test.ts`（合成 #5564 結構 fixture，明標非 OCR 真資料）。
-- [ ] **Task 5：驗收自查（AC8, AC9）** — `pnpm typecheck`(0)/`lint`(0)/`test`（既有零回歸 + 新 irc 具名測）/`build`(綠)；`pnpm db:generate` 後 migration diff 僅新增 receipt_lines；靜態掃描：無 visionAdapter 改動/繞過、既有 4 表未改、無新 npm 相依、IRC 不在 route handler；W-1-4-3 標 RESOLVED。
+- [x] **Task 0：前置** — 確認 1-4 done（`ParsedReceipt`/parseWorker/pg-boss output 在）；讀 `1-4-vision-llm-parse.md`（ReceiptLine 形狀、pg-boss job output hand-off、W-1-4-3）、`architecture.md` L330-331/L345/L396-398、`src/db/schema.ts`（既有 4 表 + drizzle 慣例）、`src/workers/parseWorker.ts`（成功路徑接點）。AGENTS.md：本 story 無新 Next/SDK API，記 Debug Log 即可。
+- [x] **Task 1：IRC 純演算法（AC1-AC4, AC7, AC8）** — `src/features/parsing/irc.ts`：`attributeIrc(parsed: ParsedReceipt): AttributedReceipt`（純）——辨識 IRC 行（amountCents<0 且 rawText/description 含母碼樣式）、抽母碼、配對母行、算 net_cents、標 is_irc/claimable/irc_attributed_to/orphan；`computeParsedSum(attributed): number`（Σ，整數分，守恆）。型別 `AttributedLine`/`AttributedReceipt`（`z.infer` 對齊或明確 interface）。`irc.test.ts` 具名 node 測：單 IRC 折抵、多筆 IRC 同母累加、孤兒 IRC(orphan,計入,不丟)、無母行、全 IRC、零 IRC（恆等）、整數分無 float、守恆不變量（Σnet+孤兒 == Σ原始 amount）、跨頁順序打亂結果相同、合成「#5564 結構契約」→ 220850。
+- [x] **Task 2：receipt_lines schema + migration（AC5, AC8, AC9）** — `src/db/schema.ts` 新增 `receiptLines` pgTable（DDL 見 Dev Notes，整數分欄、self-FK irc_attributed_to nullable、line_no 保序、session/parse_job 關聯 + index）；`pnpm db:generate` 產 `drizzle/migrations/000X_*.sql`，逐欄比對 DDL 規格；確認**僅新增表**、不改既有 4 表；G2 序（migrate→pg-boss start）既有 `src/workers/index.ts` 不動即成立。
+- [x] **Task 3：持久化 + parseWorker 接線（AC6, AC9）** — `src/features/parsing/server/`：`persistAttributedReceipt(jobId, sessionId, attributed)`（寫 receipt_lines 多列，整數分；冪等：同 job 重入先清再寫或 upsert，避免重複——比照終態守衛精神）；`src/workers/parseWorker.ts` 成功路徑：visionAdapter `parsed` → `attributeIrc` → `persistAttributedReceipt` → parsed_sum（receipt_lines 聚合或既有欄，spec 述選擇）→ markJobStatus succeeded/degraded（既有，不破壞 NFR-R2/終態守衛）。失敗/降級不寫 receipt_lines。`deferred-work#W-1-4-3` RESOLVED。
+- [x] **Task 4：regression carry-forward（AC7）** — 不偽綠：`regression-invariants.test.ts` REAL #5564 `it.todo` 保留 anchor（更新註記指向本 story 已實作演算法、真資料仍 gated W-1-4-1/W-CR-5）；演算法證明在 `irc.test.ts`（合成 #5564 結構 fixture，明標非 OCR 真資料）。
+- [x] **Task 5：驗收自查（AC8, AC9）** — `pnpm typecheck`(0)/`lint`(0)/`test`（既有零回歸 + 新 irc 具名測）/`build`(綠)；`pnpm db:generate` 後 migration diff 僅新增 receipt_lines；靜態掃描：無 visionAdapter 改動/繞過、既有 4 表未改、無新 npm 相依、IRC 不在 route handler；W-1-4-3 標 RESOLVED。
 
 ## Dev Notes
 
@@ -116,12 +116,33 @@ export const receiptLines = pgTable("receipt_lines", {
 
 ### Agent Model Used
 
-（dev-story 時填入）
+claude-opus-4-7[1m]
 
 ### Debug Log References
 
+- `drizzle-kit generate` 在缺 DATABASE_URL 時 config 載入會丟錯；以 `DATABASE_URL='postgres://localhost:5432/gen'` 離線跑（generate 不連線），產出 `0001_gifted_night_thrasher.sql`，逐欄比對僅新增 receipt_lines。
+- `notInArray` 既有 TERMINAL 由 `readonly` tuple → `const TERMINAL: string[]`（型別相容，1-5 觸及但不破壞 1-4 終態守衛）。
+- `irc.test.ts` 跨頁 fixture 代碼 `55`/`#55` 不被 `\d{3,}` regex 匹配 → 改 `555`/`#555`（測例校正，非演算法改動）。
+
 ### Completion Notes List
+
+- **Task 1（AC1-AC4/AC7/AC8）**：`src/features/parsing/irc.ts` 純函式 `attributeIrc` + `computeParsedSum`，零 IO、零 float、整數分。IRC＝`amountCents<0`；母碼 `#\s*(\d{3,})` / 行首碼 `(?:^|\s)(\d{3,})\b`；配對依代碼非位置（跨頁順序無關）。孤兒 IRC 標 `orphan=true`、`ircAttributedTo=null`、仍計入 parsed_sum（不丟、不錯帳，留 Epic 2 改綁）。`irc.test.ts` 具名 node 測涵蓋單/多 IRC、孤兒、無母、全 IRC、空、零 IRC 恆等、整數分、守恆不變量、跨頁順序無關，並含**明標 SYNTHETIC**的 #5564 結構契約（25 母 @9234 + 3 IRC = 220850，明述非 OCR 真資料）。
+- **Task 2（AC5/AC9）**：`src/db/schema.ts` 新增 `receiptLines` pgTable（整數分欄、`irc_attributed_to` 純欄無硬 FK 以免 self-cycle 插入死結、2 index）；既有 4 表零改動。`drizzle/migrations/0001_gifted_night_thrasher.sql` 純 additive CREATE TABLE + 自身 FK/index，無 ALTER/DROP 既有表，G2（migrate→pg-boss start）`src/workers/index.ts` 不動即成立。
+- **Task 3（AC6/AC9）**：`src/features/parsing/server/persistReceiptLines.ts` 冪等（依 parseJobId 先 delete 再 insert，pg-boss redelivery 不重複）；`ircAttributedTo`（母行 lineNo）→ 母行 row id 映射。`src/workers/parseWorker.ts` 成功路徑 `outcome.kind==="parsed"` → `attributeIrc` → `persistReceiptLines` → `markJobStatus` 全包在同一 try/catch：DB blip 不 rethrow（避免 pg-boss 重跑整段 Claude 解析）、best-effort `markJobFailed`、留終態（NFR-R2 付款人不死鎖）。失敗/降級分支不寫 receipt_lines。parsed_sum 不另存欄＝`Σ gross_cents`（spec AC6 明選聚合派生，無 schema 膨脹）。`W-1-4-3` RESOLVED。
+- **Task 4（AC7）**：`regression-invariants.test.ts` REAL #5564 `it.todo` anchor 保留、不偽綠；註記更新指向本 story 已實作演算法（`irc.test.ts`），真資料端到端仍誠實 gated `W-1-4-1`（無 ANTHROPIC_API_KEY）/`W-CR-5`（多頁 n=0）。
+- **Task 5（AC8/AC9）閘門證據**：`pnpm typecheck` 0 error；`pnpm lint` 0；`pnpm test` 8 files / 82 passed | 2 todo（既有零回歸 + 新 irc 具名測全綠）；`pnpm build` 綠（5 route，含既有 parse-jobs）。靜態掃描：`src/lib/llm/**` 零改動（唯一 Claude 邊界不繞過）、既有 4 表未改、零新增 npm 相依、IRC 在 worker 成功路徑非 route handler。
 
 ### Change Log
 
+- 2026-05-20 — Story 1.5 dev-story 完成（Task 0-5）。新增純 IRC 演算法 + receipt_lines schema/migration + parseWorker 成功路徑接線；W-1-4-3 RESOLVED。閘門全綠（typecheck/lint/test 82pass2todo/build）。Status → review。
+
 ### File List
+
+- NEW `src/features/parsing/irc.ts` — 純 IRC 配對 + parsed_sum 演算法
+- NEW `src/features/parsing/irc.test.ts` — node 具名測（含明標 synthetic #5564 結構契約）
+- NEW `src/features/parsing/server/persistReceiptLines.ts` — receipt_lines 冪等寫入膠合
+- NEW `drizzle/migrations/0001_gifted_night_thrasher.sql` — additive CREATE TABLE receipt_lines
+- NEW `drizzle/migrations/meta/0001_snapshot.json` + `meta/_journal.json` 更新（drizzle-kit generate 產出）
+- MODIFIED `src/db/schema.ts` — +receiptLines pgTable（既有 4 表零改）
+- MODIFIED `src/workers/parseWorker.ts` — 成功路徑接 attributeIrc + persistReceiptLines（同 try/catch，NFR-R2 保留）
+- MODIFIED `src/features/parsing/__tests__/regression-invariants.test.ts` — it.todo anchor 註記更新（不偽綠）

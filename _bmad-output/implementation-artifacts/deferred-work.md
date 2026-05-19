@@ -245,7 +245,7 @@
 
 ## W-1-4-3 — Formalize 1.4→1.5 parsed-line persistence
 
-- **Status:** OPEN
+- **Status:** ✅ RESOLVED 2026-05-20 (Story 1.5 dev-story)
 - **Priority:** P1
 - **Story:** owned by 1-5-irc-match-parsed-sum
 - **Gap:** Story 1.4 hands the parsed receipt to 1.5 as the **pg-boss
@@ -256,9 +256,17 @@
 - **Reason for defer:** receipt_lines schema is Story 1.5 scope;
   1.4 must not pre-empt it. Job-output hand-off is the minimal,
   single-Postgres, no-schema-change bridge.
-- **Trigger / resolve when:** Story 1.5 create-story — define
-  `receipt_lines` (or equivalent) and the read path from 1.4's
-  output; close here.
+- **Resolution:** Story 1.5 owns `receipt_lines` — added the Drizzle
+  table (`src/db/schema.ts`, migration `0001_gifted_night_thrasher`),
+  the pure IRC algorithm (`src/features/parsing/irc.ts`), and the
+  idempotent writer (`persistReceiptLines`). The read path is the
+  **minimal in-worker hand-off**: `parseWorker` success branch does
+  `attributeIrc(outcome.receipt) → persistReceiptLines → markJobStatus`
+  in one guarded try/catch (no cross-process pg-boss-output read; a DB
+  blip best-effort `markJobFailed` and never rethrows, preserving
+  NFR-R2 / no Claude re-parse). parsed_sum is `Σ gross_cents` over a
+  job's rows (no schema bloat; spec AC6). Failed/degraded jobs write
+  nothing. Gate green (typecheck/lint/test 82pass2todo/build).
 
 ## W-1-3-2 — Move parse images out of the pg-boss payload at scale
 
@@ -321,3 +329,7 @@
   out-of-bounds-gate & decode-error sub-items honestly reclassified as
   manual-N/A, covered by P2 fix + node tests / code-level mapping. Full
   entry kept above with RESOLVED status.
+- **W-1-4-3** — RESOLVED 2026-05-20 (Story 1.5 dev-story): receipt_lines
+  table + pure IRC algorithm + idempotent writer landed; 1.4→1.5
+  hand-off formalized as the minimal in-worker success-path bridge
+  (no cross-process output read; NFR-R2 preserved). Full entry above.
