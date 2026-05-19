@@ -88,11 +88,17 @@ export function CaptureFlow() {
         shows the native chooser (Take Photo / Photo Library / Files) —
         camera is still one tap, and uploading an existing photo works.
       */}
+      {/*
+        `sr-only`, NOT `hidden`/`display:none`: iOS Safari/WebKit ignores
+        a programmatic `.click()` on a display:none file input, so the
+        "拍收據" button would do nothing on the primary platform. sr-only
+        keeps the input in the layout tree while visually hidden.
+      */}
       <input
         ref={inputRef}
         type="file"
         accept="image/*"
-        className="hidden"
+        className="sr-only"
         onChange={onFileChange}
       />
 

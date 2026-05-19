@@ -187,4 +187,7 @@ claude-opus-4-7[1m]（dev-story，2026-05-19）
 - [x] [Review][Patch] drizzle.config 缺 env throw / Sentry 取樣率 / client DSN fallback / layout metadata — 已修（8b588f1）
 - [x] [Review][Patch] **AC1 違規（post-review，使用者發現）**：`capture="environment"` 在 iOS Safari 強制相機、移除相簿選項，違反 AC1「可改選相簿」。修：拿掉 `capture`（使用者拍板）；AC1 矛盾文字一併修正。
 - [x] [Review][Defer] W-CR-1..4 已登記 `deferred-work.md`（by-design / scale-stage）
-- 狀態：所有 patch 已修並通過閘門（lint/typecheck/test 23 pass+2 todo/build），維持 `done`。
+- [x] [Review][Patch] **on-device 驗證發現（2026-05-19，使用者實機）**：
+  - (a) 首頁渲染但「拍收據」點了沒反應 → 根因 Next 16 dev 阻擋 LAN 來源 `/_next/*`（cross-origin 安全預設），client bundle 未載入→未 hydrate→onClick 沒掛。修：`next.config.ts` 加 `allowedDevOrigins`（dev-only，prod 無影響）。
+  - (b) 連帶修 iOS WebKit 雷：file input 由 `hidden`(display:none) 改 `sr-only`——iOS Safari 對 display:none input 的 `.click()` 會被忽略。
+- 狀態：所有 patch 已修並通過閘門（lint/typecheck/test 23 pass+2 todo/build），維持 `done`；on-device 互動驗證進行中（W-1-2-1）。
