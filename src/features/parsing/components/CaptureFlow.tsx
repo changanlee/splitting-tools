@@ -81,11 +81,17 @@ export function CaptureFlow() {
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-5 p-4">
+      {/*
+        ⚠️ Do NOT add `capture="environment"`. On iOS Safari `capture`
+        FORCES the camera and removes the "Photo Library / Choose File"
+        option, which violates AC1 ("可改選相簿"). Without it, the OS
+        shows the native chooser (Take Photo / Photo Library / Files) —
+        camera is still one tap, and uploading an existing photo works.
+      */}
       <input
         ref={inputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         className="hidden"
         onChange={onFileChange}
       />

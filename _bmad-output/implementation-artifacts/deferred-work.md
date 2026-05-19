@@ -38,7 +38,11 @@
   CI env (AC5 strategy keeps the canvas glue out of node unit tests to
   avoid heavy deps). Specifically un-automated: real device camera capture
   (`capture="environment"`), drag-to-draw/move/remove mask rectangles,
-  iOS HEIC decode-failure → friendly-error path.
+  iOS HEIC decode-failure → friendly-error path. **(2026-05-19 added)**
+  Post-review fix: `capture` removed — manual test MUST confirm iOS
+  Safari shows the native chooser (Take Photo / Photo Library / Files)
+  and that **uploading an existing photo** runs the full
+  compress→mask→ready flow (AC1「可改選相簿」).
 - **Reason for defer:** Requires a real iOS Safari / Android Chrome
   device; the pure gating maths (`computeResizedDimensions`,
   `clampMaskRect`, `hasUsableMaskOrSkip`) IS fully node-tested (19 tests).

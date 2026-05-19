@@ -14,7 +14,7 @@ so that 控制傳輸量、且會員卡號絕不離開我的裝置（FR1、FR2、
 
 > 來源：`epics.md#Story 1.2`（GWT 逐字）＋ 為防 LLM 模糊化補上可驗證門檻。
 
-1. **AC1（擷取入口）** Given 付款人在首頁，When 點「拍收據」，Then 觸發 `<input type="file" accept="image/*" capture="environment">`（行動裝置相機優先、可改選相簿）；未選/取消不報錯、回到可再點狀態。
+1. **AC1（擷取入口）** Given 付款人在首頁，When 點「拍收據」，Then 觸發 `<input type="file" accept="image/*">`（**不寫死 `capture`**：`capture="environment"` 在 iOS Safari 會強制相機並移除「相簿/檔案」選項，違反「可改選相簿」；移除後由 OS 原生選單提供「拍照／相簿／檔案」，相機仍一鍵可達、亦可上傳既有圖片）；未選/取消不報錯、回到可再點狀態。〔2026-05-19 修：原 AC 文字自相矛盾（同時要 `capture` 又要可選相簿），經使用者拍板採「拿掉 capture」〕
 2. **AC2（前端壓縮）** Given 已選一張影像，When 進入處理，Then 於**裝置端**將長邊縮至 ~1600px（等比、不放大小於 1600px 的圖）、重新編碼為 JPEG（品質 ~0.8）、**移除 EXIF**；典型收據輸出 < ~500KB。
 3. **AC3（卡號遮蔽 — 強制決斷）** Given 壓縮後預覽，When 上傳前，Then 付款人必須二擇一才能繼續：(a) 於影像上拉出 ≥1 個**不透明實心**遮罩矩形覆蓋會員卡號區並套用，或 (b) 明確勾選「此收據無會員卡號」；遮罩像素**燒進**輸出影像（非 CSS overlay、非可逆模糊）。
 4. **AC4（NFR-S3 單向保證）** Given 任一時點，Then **只有**已遮蔽＋已壓縮的影像存在於可外送狀態；未遮原圖（原始 `File`/`ImageBitmap`/原始 canvas）僅短暫存在記憶體、用後即釋放，**永不**寫入 `localStorage`/`sessionStorage`/`IndexedDB`、**永不**進入任何網路請求、**永不**進 log。本 story 不發送任何網路請求（上傳屬 Story 1.3）。
@@ -40,7 +40,7 @@ so that 控制傳輸量、且會員卡號絕不離開我的裝置（FR1、FR2、
   - [x] `src/lib/image/mask.ts`：`burnMasksIntoCanvas`（`globalAlpha=1`、`source-over`、`#000` 實心 `fillRect`，座標經 `clampMaskRect`，zero-area 跳過）+ `applyMaskAndEncode`（燒入後 `canvasToJpegBlob` 回唯一 masked Blob）；typecheck+lint 綠
   - [x] 註解明禁 CSS overlay / blur（可逆）；`applyMaskAndEncode` 回傳之 Blob 為唯一可離開裝置物，呼叫端用後棄 canvas 參考（Task 6 落實）
 - [x] **Task 5：擷取 + 遮罩編輯 UI（client component）（AC1, AC3, AC6, AC7, AC8）**
-  - [x] `src/features/parsing/components/CaptureFlow.tsx`（`'use client'`）：隱藏 `<input type="file" accept="image/*" capture="environment">` + ≥56px「拍收據」CTA → `compressToCanvas` → 狀態機 idle/compressing/editing/ready/error；`input.value=""` 重置（取消/重選不卡，AC1）
+  - [x] `src/features/parsing/components/CaptureFlow.tsx`（`'use client'`）：隱藏 `<input type="file" accept="image/*">`（**無 `capture`**，見 AC1 修正）+ ≥56px「拍收據」CTA → `compressToCanvas` → 狀態機 idle/compressing/editing/ready/error；`input.value=""` 重置（取消/重選不卡，AC1）
   - [x] `src/features/parsing/components/MaskEditor.tsx`（`'use client'`）：display canvas 畫未遮像素（僅顯示、不輸出）、pointer 拖拉產生影像座標矩形（百分比 overlay 隨 RWD 縮放、可逐一移除）、shadcn `Checkbox`「此收據沒有會員卡號」；`hasUsableMaskOrSkip` 未滿足時「下一步」`disabled`
   - [x] `yes | pnpm dlx shadcn@latest add checkbox`（radix-nova，用既有 `radix-ui`+`lucide-react`，**零新增 npm 相依**）；未自造 overlay 的可聚焦元件改用 Radix Checkbox
   - [x] 友善錯誤映射 `ImageDecodeError`→不外洩原文 + 重試（AC6）；隱私文案於 idle/編輯/ready（AC8）；行動單欄 `max-w-md`、CTA h-14、按鈕 h-12、狀態 icon+文字+語意色三重編碼（AC7）；**驗證**：typecheck/lint/build 綠、dev smoke HOME 200 含「拍收據/分帳小工具」（拖拉互動為瀏覽器手動驗證，其 gating 邏輯已於 Task 2 node 全測）
@@ -173,3 +173,18 @@ claude-opus-4-7[1m]（dev-story，2026-05-19）
 - `src/features/.gitkeep`（D：目錄已有內容）
 - `_bmad-output/implementation-artifacts/1-2-capture-compress-mask.md`（M：本 story 檔 dev 記錄）
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`（M：1-2 狀態流轉）
+
+## Review Findings（code review 2026-05-19，commit 8dfcb87，no-spec 模式）
+
+> no-spec 模式跳過 Acceptance Auditor，故 spec↔code 矛盾不在 hunter 射程；
+> 其中 AC1 矛盾由使用者於 review 後對話中發現補上（非 silent）。
+
+- [x] [Review][Patch] geometry.clampMaskRect 非有限值→零面積 + 向外取整（隱私安全）— 已修 + 3 node 測試（commit d1d879f）
+- [x] [Review][Patch] MaskEditor 多指/pointercancel/未排版幻影座標 + 儲存前 clamp（堵 NFR-S3 閘門洞）— 已修（d1d879f）
+- [x] [Review][Patch] CaptureFlow 連點雙重 burn — await 前同步鎖 phase — 已修（d1d879f）
+- [x] [Review][Patch] compress.ts toBlob timeout / 0×0 bitmap / ctx→decode-error — 已修（d1d879f）
+- [x] [Review][Patch] worker shutdown 重入+timeout / DB-wait 記錄真實錯誤 — 已修（8b588f1）
+- [x] [Review][Patch] drizzle.config 缺 env throw / Sentry 取樣率 / client DSN fallback / layout metadata — 已修（8b588f1）
+- [x] [Review][Patch] **AC1 違規（post-review，使用者發現）**：`capture="environment"` 在 iOS Safari 強制相機、移除相簿選項，違反 AC1「可改選相簿」。修：拿掉 `capture`（使用者拍板）；AC1 矛盾文字一併修正。
+- [x] [Review][Defer] W-CR-1..4 已登記 `deferred-work.md`（by-design / scale-stage）
+- 狀態：所有 patch 已修並通過閘門（lint/typecheck/test 23 pass+2 todo/build），維持 `done`。
