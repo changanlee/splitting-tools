@@ -65,6 +65,27 @@
 
 ---
 
+## W-1-2b-1 — Story 1.2b multi-page manual browser verification
+
+- **Status:** OPEN
+- **Priority:** P1
+- **Story:** 1-2b-multi-page-capture (AC1/AC2/AC3/AC6/AC8)
+- **Gap:** canvas/pointer/objectURL interactions not node-testable
+  (same strategy as W-1-2-1). Un-automated: multi-page accumulate
+  ("再拍下一段"), per-page mask, page reorder (上移/下移) + remove,
+  finish → ordered deduped Blob[], single-page parity with 1.2,
+  thumbnail object-URL lifecycle (no leak on remove/dedupe/reset).
+- **Reason for defer:** needs a real iOS Safari / Android Chrome
+  device; the list maths (`pages.ts`) IS fully node-tested (21 tests).
+- **Trigger / resolve when:** manual pass on the running dev server
+  (`http://192.168.1.8:3001`) on a real device — capture ≥2 pages,
+  reorder, remove, dedupe (re-capture identical), finish; confirm
+  single-page still equals 1.2. Record in `1-2b-...md` Debug Log,
+  then close here.
+- **Tracked in:** `1-2b-multi-page-capture.md` Completion Notes.
+
+---
+
 ## Deferred from: code review (2026-05-19, commit 8dfcb87)
 
 > Source: `/code-review` of the scaffold commit (Blind + Edge + LLM
