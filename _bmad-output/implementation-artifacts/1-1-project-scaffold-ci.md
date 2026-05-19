@@ -1,6 +1,6 @@
 # Story 1.1: 專案骨架與 CI 基線
 
-Status: in-progress
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -132,8 +132,8 @@ claude-opus-4-7[1m]（dev-story，2026-05-19）
 - ✅ Task 6（AC6）：vitest 4.1.6；#5564 placeholder 與 README；雙不變量對 placeholder 執行且綠 + 兩 `it.todo` carry-forward（Story 1.4/1.5、5.1）；`.github/workflows/ci.yml`；**實證** 本機鏈全綠、故意失敗 → vitest exit 1（CI 紅燈成立）。
 - ✅ Task 7（AC7）：@sentry/nextjs 10.53.1（server/edge/instrumentation/instrumentation-client + withSentryConfig）；`SENTRY_DSN` 顯式 guard；**實證** `pnpm build` 無 DSN 成功（優雅略過、產出 `.next/standalone/server.js`）。
 - ✅ Task 8（AC8）：`.env.example`（5 鍵齊備）+ `.gitignore` `!.env.example`；**實證** `git check-ignore`：`.env`/`.env.local` IGNORED、`.env.example` 追蹤。
-- ⏸️ Task 9（部分）：本機 `pnpm lint && typecheck && test` 全綠、worker+G2/`pnpm build`/`docker compose config` 皆實證；**唯 `docker compose up` runtime 因環境供應鏈政策延後**（見 Debug Log；使用者決議等窗口重驗，Dockerfile 無需改）。push-CI 不適用本機（無 remote、未 push）。
-- **狀態：留 `in-progress`（非 review）**——8/9 task 全綠，Task 9 僅缺 compose-up runtime 一項外部阻斷待重驗；不謊報完成（verification-before-completion）。
+- ✅ Task 9（**完成，2026-05-20 retry #5**）：`WEB_PORT=3010 DB_PORT=55470 docker compose up -d --build` GREEN——db healthy、worker log `database reachable → drizzle migrate complete → pg-boss started`（G2 init order 端到端實證）、web HTTP 200、web→db:5432 OPEN；compose down 清乾淨。docker-verify 過程暴露並修復 3 個真實 blocker（皆未弱化 lockfile/minimumReleaseAge）：①供應鏈窗口（等過 ~01:44）②慢速 build 網路 timeout 大 next/swc tarball → 兩 Dockerfile 加 pnpm `fetch-timeout 600000`/`fetch-retries 5`（`--frozen-lockfile` 保留）③pnpm 10 `ERR_PNPM_IGNORED_BUILDS` → package.json 加 `pnpm.onlyBuiltDependencies`（esbuild/sharp/unrs-resolver）+ pin `"packageManager":"pnpm@10.32.1"`（docker corepack 與 host 同版）。`deferred-work.md#W-1-1-1` → RESOLVED。
+- **狀態：`done`**——9/9 task 全綠、docker runtime 端到端實證、3 修復非 silent 登記；不謊報（verification-before-completion 滿足）。
 
 ### File List
 

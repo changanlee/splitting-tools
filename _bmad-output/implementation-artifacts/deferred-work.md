@@ -14,7 +14,20 @@
 
 ## W-1-1-1 — Story 1.1 `docker compose up` runtime re-verify
 
-- **Status:** OPEN
+- **Status:** RESOLVED (2026-05-20 02:33, by retry #5). The
+  docker-verify (its whole purpose) surfaced 3 real, distinct
+  blockers, each fixed without weakening the lockfile or
+  minimumReleaseAge policy: (1) supply-chain window cleared ~01:44;
+  (2) slow build-network timed out on the large next/swc tarballs →
+  added pnpm `fetch-timeout 600000`/`fetch-retries 5` to both
+  Dockerfiles (`--frozen-lockfile` kept); (3) pnpm 10
+  `ERR_PNPM_IGNORED_BUILDS` → added `pnpm.onlyBuiltDependencies`
+  allowlist (esbuild/sharp/unrs-resolver) to package.json AND pinned
+  `"packageManager":"pnpm@10.32.1"` so docker corepack uses the same
+  pnpm as the host. Final verify GREEN: db healthy; worker logs
+  `database reachable → drizzle migrate complete → pg-boss started`
+  (G2 init order proven end-to-end); web HTTP 200; web→db:5432 OPEN.
+  Compose torn down clean. Story 1.1 → done.
 - **Priority:** P1
 - **Story:** 1-1-project-scaffold-ci (Task 9, AC3)
 - **Gap:** In-container `pnpm install --frozen-lockfile` blocked by the
@@ -196,6 +209,11 @@
 
 ## Resolved
 
+- **W-1-1-1** — RESOLVED 2026-05-20 (docker retry #5): scaffold docker
+  compose verified (db/web/worker, G2 init order, web↔db). 3 distinct
+  blockers fixed (supply-chain window; pnpm fetch-resilience; pnpm10
+  onlyBuiltDependencies + packageManager pin) without weakening
+  lockfile/policy. Full entry kept above with RESOLVED status.
 - **W-1-2-1** — RESOLVED 2026-05-19 (on-device iOS Safari test): Story
   1.2 capture/compress/mask core manual path passed on a real device;
   out-of-bounds-gate & decode-error sub-items honestly reclassified as

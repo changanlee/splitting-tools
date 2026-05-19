@@ -7,7 +7,13 @@ RUN corepack enable
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile
+# Network resilience (see Dockerfile deps stage): survive a slow
+# registry fetch of the large next/swc tarballs. Lockfile + policy
+# untouched; --frozen-lockfile kept.
+RUN pnpm config set fetch-timeout 600000 \
+  && pnpm config set fetch-retries 5 \
+  && pnpm config set fetch-retry-maxtimeout 120000 \
+  && pnpm install --frozen-lockfile
 
 # Source + the generated migrations the worker applies before pg-boss start.
 COPY tsconfig.json ./

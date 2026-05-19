@@ -7,7 +7,15 @@ WORKDIR /app
 # --- deps: full install for the build ---
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm install --frozen-lockfile
+# Network resilience for a constrained build network: the large
+# next/swc tarballs can exceed pnpm's 60s default fetch timeout
+# (observed: GET next-16.2.6.tgz "operation aborted due to timeout").
+# This does NOT touch the lockfile or the minimumReleaseAge policy —
+# --frozen-lockfile is kept; only slow-fetch survival is improved.
+RUN pnpm config set fetch-timeout 600000 \
+  && pnpm config set fetch-retries 5 \
+  && pnpm config set fetch-retry-maxtimeout 120000 \
+  && pnpm install --frozen-lockfile
 
 # --- builder: produce .next/standalone ---
 FROM base AS builder
