@@ -14,6 +14,7 @@ import {
   validateParseSubmit,
 } from "@/features/parsing/schema";
 import { checkParseBudget } from "@/features/parsing/server/budget";
+import { extractClientIp, sha256IpKey } from "@/lib/rateLimit.server";
 import {
   createQueuedJob,
   markJobFailed,
@@ -71,9 +72,26 @@ export async function POST(
     }
   }
 
-  // Story 1.7 seam (default pass at 1.3).
-  const budget = checkParseBudget(linkId);
-  if (!budget.ok) return err("BUDGET", budget.message, 429);
+  // Story 1.7: per-session AND per-IP daily page-budget enforcement
+  // (FR46 / NFR-S7 / NFR-L5). Counted by `pageCount` — already
+  // validated to be 1..MAX_PARSE_PAGES upstream — so a deny here
+  // means the client already passed shape/size checks. IP is hashed
+  // (NFR-S3 privacy; raw IP never persisted). 429 carries Retry-After.
+  const ipKey = sha256IpKey(extractClientIp(request.headers));
+  const budget = await checkParseBudget({
+    sessionId: linkId,
+    ipKey,
+    pages: pageCount,
+  });
+  if (!budget.ok) {
+    const body: ErrorEnvelope = {
+      error: { code: "BUDGET", message: budget.message },
+    };
+    return Response.json(body, {
+      status: 429,
+      headers: { "Retry-After": String(budget.retryAfterSeconds) },
+    });
+  }
 
   // Session must exist (404, not an FK-violation-as-502). Full link
   // semantics = Story 3.1; device-token authz = Epic 4.

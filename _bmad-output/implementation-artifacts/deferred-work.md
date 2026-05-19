@@ -343,6 +343,25 @@
   (a Costco receipt is ≪ a few hundred lines). Revisit (chunked
   inserts) only if the page cap is raised or row counts grow.
 
+## Deferred from: Story 1.7 (2026-05-20)
+
+- **W-1-7-1** — `checkParseBudget` fail-OPEN on DB outage (v1 explicit
+  tradeoff). Status: OPEN, Priority: P2 (revisit at stage ≥ 1k DAU).
+  If the `rate_counters` upsert throws (DB blip / unavailable), the
+  seam logs and returns `ok:true` so a legitimate payer is not
+  deadlocked (NFR-R2 / NFR-P1 preferred over grief shield in v1; the
+  preceding `validateParseSubmit` + `sessionExists` lookups would
+  have already failed under a real DB outage). At stage ≥ 1 we may
+  invert to fail-CLOSED with a circuit breaker + alerting; until
+  then, the explicit choice is documented here and in the seam.
+- **W-1-7-2** — Per-traffic budget tuning + real concurrency / race.
+  Status: OPEN, Priority: post-deploy. `PER_SESSION_DAILY_PAGES=40`,
+  `PER_IP_DAILY_PAGES=200`, `RATE_WINDOW_MS=24h` are conservative
+  stage-0 defaults — tune with real traffic distributions. The single
+  UPSERT can over-count slightly at burst boundaries (accepted
+  v1 grief-shield tradeoff). Real high-concurrency race / per-minute
+  burst limiting / CAPTCHA-style mitigations belong here.
+
 ## Deferred from: code review of story-1.6 (2026-05-20)
 
 - **W-CR-9** — structureGuard tax/currency heuristic precision.
