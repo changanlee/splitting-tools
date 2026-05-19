@@ -69,7 +69,14 @@ export function decideRateLimit(
 
   if (newCount > limit) {
     const elapsed = now.getTime() - newWindowStart.getTime();
-    const retryAfterMs = Math.max(0, windowMs - elapsed);
+    // Bounded by [0, windowMs]: a backward clock skew (`elapsed < 0`)
+    // would otherwise inflate the wait past a full window; a runaway
+    // `elapsed > windowMs` (caller passed an inconsistent state) would
+    // produce a negative wait. Both are defensive — review P1.
+    const retryAfterMs = Math.min(
+      windowMs,
+      Math.max(0, windowMs - elapsed),
+    );
     return { allow: false, newCount, newWindowStart, retryAfterMs };
   }
   return { allow: true, newCount, newWindowStart };

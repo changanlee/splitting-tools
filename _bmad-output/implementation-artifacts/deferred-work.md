@@ -361,6 +361,36 @@
   UPSERT can over-count slightly at burst boundaries (accepted
   v1 grief-shield tradeoff). Real high-concurrency race / per-minute
   burst limiting / CAPTCHA-style mitigations belong here.
+- **W-1-7-3** — Trusted-proxy gate / IP-spoofing hardening for bare
+  deployments. Status: OPEN, Priority: P2 (depends on deployment).
+  `extractClientIp` trusts the X-Forwarded-For first hop, which is
+  correct ONLY behind a single trusted proxy that overwrites/normalizes
+  XFF (Cloudflare / Vercel / our reverse proxy). A bare deployment
+  (direct exposure) lets an attacker rotate XFF to bypass the per-IP
+  cap entirely. v1 ships behind a known proxy, so the assumption is
+  documented but not enforced. Add `TRUST_PROXY=1` env gate + safe
+  fallback (e.g. Node `req.socket.remoteAddress` via the underlying
+  adapter) when staging supports it.
+- **W-1-7-4** — `rate_counters` TTL/GC for orphaned/spam keys.
+  Status: OPEN, Priority: stage ≥ 1 (monitoring + cleanup).
+  `checkParseBudget` writes a `session:<linkId>` key BEFORE
+  `sessionExists` — by design, so grief on nonexistent linkIds is
+  rate-limited too — but it also leaves orphan rows for junk linkIds.
+  Spam from rotated IPs likewise leaves IP rows. There is no cron /
+  cleanup path today; add a daily worker that `DELETE FROM
+  rate_counters WHERE window_start < NOW() - INTERVAL '2 days'`
+  when traffic warrants it (or piggy-back on Story 6.1
+  lifecycleWorker once that lands).
+- **W-1-7-1 (extended 2026-05-20, story-1.7 code-review)** —
+  `Promise.all` coupled fail-OPEN: if the IP-key UPSERT throws AFTER
+  the session-key UPSERT already incremented (or vice-versa), the
+  catch in `checkParseBudget` fails OPEN on the whole request — but
+  the successful key now carries `+pages` phantom usage. Self-heals
+  over 24h as the window rolls. Same fail-OPEN-class residual as
+  pool-exhaustion → all-fail-OPEN under heavy burst. Both are the
+  accepted v1 NFR-R2/NFR-P1 tradeoff (legitimate payer not deadlocked
+  > strict enforcement). Revisit alongside W-1-7-1 with circuit
+  breaker + alerting at stage ≥ 1k DAU.
 
 ## Deferred from: code review of story-1.6 (2026-05-20)
 

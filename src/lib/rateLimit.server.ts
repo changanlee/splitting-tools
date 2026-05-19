@@ -13,7 +13,7 @@
  * v1 grief-shield tradeoff (counted past the cap reduces refresh, not
  * increases it).
  */
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 
 import { sql } from "drizzle-orm";
 
@@ -43,18 +43,27 @@ export async function checkAndIncrementRate(
     Number.isFinite(pages) && pages > 0 ? Math.floor(pages) : 0;
   if (p === 0) return { allow: true, retryAfterMs: 0 };
 
+  // Defensive: a non-finite/non-positive windowMs interpolated into the
+  // INTERVAL literal would either become "NaN milliseconds" (SQL syntax
+  // error → caller's catch fails OPEN with no enforcement) or disable
+  // the window. windowMs is internally a constant, but the function
+  // signature is exported; treat a bad value as an immediate fail-OPEN
+  // (review P1, defensive — never silently lift the cap).
+  if (!Number.isFinite(windowMs) || windowMs <= 0) {
+    return { allow: true, retryAfterMs: 0 };
+  }
   const intervalSql = sql.raw(`INTERVAL '${Math.floor(windowMs)} milliseconds'`);
   const rows = (await db.execute(sql`
     INSERT INTO rate_counters (key, window_start, count)
     VALUES (${key}, NOW(), ${p})
     ON CONFLICT (key) DO UPDATE SET
       window_start = CASE
-        WHEN rate_counters.window_start < NOW() - ${intervalSql}
+        WHEN rate_counters.window_start <= NOW() - ${intervalSql}
           THEN NOW()
         ELSE rate_counters.window_start
       END,
       count = CASE
-        WHEN rate_counters.window_start < NOW() - ${intervalSql}
+        WHEN rate_counters.window_start <= NOW() - ${intervalSql}
           THEN ${p}
         ELSE rate_counters.count + ${p}
       END
@@ -71,21 +80,45 @@ export async function checkAndIncrementRate(
     return { allow: true, retryAfterMs: 0 };
   }
   const count = Number(row.count);
-  const elapsedMs = Number(row.elapsed_ms);
+  const elapsedRaw = Number(row.elapsed_ms);
+  // Bound [0, windowMs] and treat a non-finite elapsed (driver quirk /
+  // clock skew) as "full window remaining" so Retry-After is always a
+  // valid integer second per RFC 7231 — never `NaN` or negative
+  // (review P1, pairs with the pure-decideRateLimit bound).
+  const elapsedMs = Number.isFinite(elapsedRaw) ? elapsedRaw : 0;
   if (count > limit) {
-    const retryAfterMs = Math.max(0, windowMs - elapsedMs);
+    const retryAfterMs = Math.min(
+      windowMs,
+      Math.max(0, windowMs - elapsedMs),
+    );
     return { allow: false, retryAfterMs };
   }
   return { allow: true, retryAfterMs: 0 };
 }
 
+let hmacFallbackWarned = false;
+
 /**
  * Hashed IP key — `ip:<32-hex>`. Architecture L259 (privacy NFR-S3):
- * raw IP is NEVER persisted. The truncated 32-hex prefix is more than
- * enough for collision-free grief-shield buckets (~10^38 entropy).
+ * raw IP is NEVER persisted. Review P3: a plain SHA-256 of an IP is
+ * REVERSIBLE by enumeration (IPv4 is 2^32 — instant for an attacker
+ * who reads the DB), so the privacy benefit collapses. Switching to
+ * HMAC-SHA256 with a per-deployment secret (`IP_HASH_SECRET`) makes
+ * the hash genuinely irreversible without that secret. If the secret
+ * isn't set we fall back to SHA-256 (don't fail boot — v1 deployments
+ * may roll the secret in gradually) and log a one-shot warning.
  */
 export function sha256IpKey(ip: string): string {
-  const hex = createHash("sha256").update(ip).digest("hex").slice(0, 32);
+  const secret = process.env.IP_HASH_SECRET;
+  const hex = secret
+    ? createHmac("sha256", secret).update(ip).digest("hex").slice(0, 32)
+    : createHash("sha256").update(ip).digest("hex").slice(0, 32);
+  if (!secret && !hmacFallbackWarned) {
+    hmacFallbackWarned = true;
+    console.warn(
+      "[rateLimit] IP_HASH_SECRET not set — IP keys are plain SHA-256 (reversible by enumeration). Set IP_HASH_SECRET in deployment to enable HMAC.",
+    );
+  }
   return `ip:${hex}`;
 }
 

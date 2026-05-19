@@ -1,6 +1,6 @@
 # Story 1.7: 解析端點濫用/預算防護（FR46 / NFR-S7 / NFR-L5）
 
-Status: review
+Status: done
 
 ## ⚠️ Dev 鐵則（最高優先）
 
@@ -111,10 +111,23 @@ claude-opus-4-7[1m]
 ### Change Log
 
 - 2026-05-20 — Story 1.7 dev-story 完成（Task 0-5）。新增純 rate-limit 決策邏輯（PER_SESSION_DAILY_PAGES=40、PER_IP_DAILY_PAGES=200、24h 窗）+ 原子 DB upsert glue + IP 哈希（NFR-S3 隱私）+ 1.3 seam 升級為真 enforcement + 429 + Retry-After。fail-OPEN v1 取捨明列 W-1-7-1（非靜默）。零 migration / 零新 npm / visionAdapter 零改動 / regression anchor 不動。閘門全綠（typecheck/lint/test 107pass2todo/build）。Status → review。
+- 2026-05-20 — Code review（full，3 hunters）完成。Acceptance Auditor 判 **8/8 AC SATISFIED**、honesty 鐵則全守、閘門獨立驗證綠（含 git diff 零改動於 schema/migrations/package/visionAdapter/regression-anchor）。套用 4 review patch（P1 NaN-safe + Math.min ceiling、P2 SQL `<` → `<=` 對齊純 `>=` 重置語意、P3 IP 哈希 sha256 → HMAC-SHA256 with `IP_HASH_SECRET` env + fallback 警告、P4 budget.test 加 `console.error` spy 斷言抗 wrong-reason pass）；3 defer 登記（W-1-7-3 trusted-proxy gate、W-1-7-4 rate_counters TTL/GC、W-1-7-1 擴展涵蓋 Promise.all 耦合 + 池耗盡）；~15 dismiss（spec-conformant 或 unreachable 或 out-of-scope）。閘門重跑全綠（typecheck/lint/test **107pass 2todo** 零回歸/build）。Status → done。**Epic 1 全 done**。
+
+### Review Findings
+
+> Code review 2026-05-20（full，3 hunters）。**Acceptance Auditor 判 8/8 AC SATISFIED**、honesty 鐵則全守、閘門獨立驗證為真（typecheck 0 / lint 0 / **test 10 files 107pass 2todo** / build 5 routes / zero diff on schema/migrations/package/visionAdapter/regression-anchor）。Blind/Edge 提出 4 unambiguous 改善與 3 W-defer：
+
+- [x] [Review][Patch] NaN-safe `retryAfter`：`budget.ts` 對 `retryAfterMs` 加 `Number.isFinite` 守護；`decideRateLimit` 與 `checkAndIncrementRate` 都加 `Math.min(windowMs, ...)` 上限（防止時鐘倒退/異常 DB 回值產生 `String(NaN)` 的 Retry-After 違反 RFC 7231）[src/lib/rateLimit.ts, rateLimit.server.ts, budget.ts]
+- [x] [Review][Patch] SQL 視窗邊界對齊：`checkAndIncrementRate` 的 `WHEN window_start < NOW() - INTERVAL` 改 `<=`，與純 `decideRateLimit` 的 `>= windowMs` 重置語意一致（除掉 1ms tick 級 SQL-vs-pure divergence）[src/lib/rateLimit.server.ts]
+- [x] [Review][Patch] IP 哈希強化為 HMAC-SHA256 + 環境祕密：sha256(ip) 對 IPv4 / IPv6 prefix 是可枚舉的（NFR-S3 隱私宣稱 "raw IP never persisted" 仍為真，但雜湊本身對拿到 DB 讀取權的攻擊者可逆向 — 用 HMAC+secret 真正阻斷）。`IP_HASH_SECRET` 未設時 fall back 至 sha256 + 一次性 warn（v1 部署可漸進切換、不會 boot fail）[src/lib/rateLimit.server.ts]
+- [x] [Review][Patch] `budget.test.ts` 加 `vi.spyOn(console,'error')` 斷言：確保 fail-OPEN 真的走 catch（非靜默），且即使開發者本地有 `DATABASE_URL` 也能誠實偵測「未走 fail-OPEN 而是真實放行」的 wrong-reason pass [src/features/parsing/server/budget.test.ts]
+- [x] [Review][Defer] 受信代理閘門（XFF 首跳信任假設）/裸機部署 IP-spoof 防護 → W-1-7-3（v1 假設 Cloudflare/Vercel 單層代理；裸機部署需 `TRUST_PROXY` env gate + socket fallback）
+- [x] [Review][Defer] `rate_counters` TTL/GC 清理（無 cron 清理，spam linkId/IP key 會累積；session: 鍵綁定不存在的 linkId 也會留下 orphan row）→ W-1-7-4（stage ≥ 1 加排程 cleanup）
+- [x] [Review][Defer] `Promise.all` 雙鑰耦合失敗 → 兩鑰其一拋錯時 catch fails-OPEN 整體，但另一鑰可能已成功 increment（phantom +pages 在 24h 窗自然消退）；池耗盡 fail-OPEN 同類殘留 → 併入 W-1-7-1（fail-OPEN v1 取捨範疇）
 
 ### File List
 
-- NEW `src/lib/rateLimit.ts` — 純決策邏輯 + 可調常數（PER_SESSION_DAILY_PAGES/PER_IP_DAILY_PAGES/RATE_WINDOW_MS）
+- NEW `src/lib/rateLimit.ts` — 純決策邏輯 + 可調常數（PER_SESSION_DAILY_PAGES/PER_IP_DAILY_PAGES/RATE_WINDOW_MS）；review P1：`Math.min(windowMs, …)` 上限防鐘倒退
 - NEW `src/lib/rateLimit.test.ts` — 11 具名 node 測（重置/累加/邊界/防禦性/defaults）
 - NEW `src/lib/rateLimit.server.ts` — atomic UPSERT glue + sha256IpKey + extractClientIp
 - MODIFIED `src/features/parsing/server/budget.ts` — seam 升級為真 1.7 實作（async 雙鑰 + fail-OPEN W-1-7-1）
