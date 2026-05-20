@@ -49,7 +49,29 @@ describe("regression invariants (#5564)", () => {
   it.todo(
     "parsed_sum == 2208.50 against the REAL #5564 fixture — gated W-1-4-1 (algorithm: irc.test.ts)",
   );
-  it.todo(
-    "settlement_sum == parsed_sum via src/lib/money/settle.ts — fill in Story 5.1 (FR50)",
-  );
+  // Story 5.1 — settle.ts deterministic settlement function landed.
+  // Conservation contract Σ byIdentity + pending + orphanIrc ==
+  // parsed_sum is asserted in settle.test.ts across multiple shapes;
+  // here we re-assert it at the cross-epic boundary against the
+  // placeholder anchor (220850), proving the math gate from the
+  // CI deployment perspective. Real-fixture #5564 still anchored at
+  // it.todo above (gated W-1-4-1).
+  it("settlement_sum == parsed_sum on the #5564 placeholder (FR50 / Story 5.1)", async () => {
+    const { settle, settlementSum } = await import("@/lib/money/settle");
+    const { RECEIPT_5564 } = await import(
+      "@/features/parsing/__fixtures__/receipt-5564.placeholder"
+    );
+    const lines = [
+      {
+        id: "placeholder-line",
+        netCents: RECEIPT_5564.expectedParsedSumCents,
+        isIrc: false,
+        claimable: true,
+        orphan: false,
+      },
+    ];
+    // No claimers → everything pending; conservation must hold.
+    const r = settle(lines, []);
+    expect(settlementSum(r)).toBe(RECEIPT_5564.expectedParsedSumCents);
+  });
 });

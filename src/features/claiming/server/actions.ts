@@ -21,6 +21,10 @@ import {
   lineBelongsToSession,
   toggleClaim,
 } from "@/features/claiming/server/claimRepo";
+import {
+  appendChange,
+  latestChangeForIdentity,
+} from "@/features/claiming/server/changeLog";
 import { isValidLinkId } from "@/lib/linkId";
 
 const FRIENDLY_INVALID = "輸入內容格式不正確，請確認後再試。";
@@ -49,10 +53,16 @@ export async function toggleClaimAction(
     const lineOk = await lineBelongsToSession(linkId, receiptLineId);
     if (!lineOk) throw new Error(FRIENDLY_NOT_FOUND);
 
-    await toggleClaim({
+    const { claimed } = await toggleClaim({
       sessionId: linkId,
       receiptLineId,
       identityId: identity.id,
+    });
+    await appendChange({
+      sessionId: linkId,
+      receiptLineId,
+      identityId: identity.id,
+      action: claimed ? "claim" : "unclaim",
     });
   } catch (e) {
     if (
@@ -92,6 +102,13 @@ export async function setClaimWeightAction(
           eq(claims.identityId, identity.id),
         ),
       );
+    await appendChange({
+      sessionId: linkId,
+      receiptLineId,
+      identityId: identity.id,
+      action: "weight",
+      details: { weight },
+    });
   } catch (e) {
     if (
       e instanceof Error &&
@@ -101,6 +118,92 @@ export async function setClaimWeightAction(
     }
     console.error(
       "[setClaimWeightAction] failed:",
+      e instanceof Error ? e.message : String(e),
+    );
+    throw new Error(FRIENDLY_UNEXPECTED);
+  }
+  revalidatePath(`/splits/${linkId}/claim`);
+}
+
+/**
+ * Story 4.6 — undo my last claim action (toggle or weight).
+ * Reads the latest claim_changes row for (session, identity), reverses
+ * it, and appends a fresh 'undo' record so a second undo can no-op.
+ */
+export async function undoLastClaimAction(
+  linkId: string,
+  formData: FormData,
+): Promise<void> {
+  const rawToken = String(formData.get("deviceToken") ?? "");
+  try {
+    const identity = await resolveIdentity(linkId, rawToken);
+    const latest = await latestChangeForIdentity(linkId, identity.id);
+    if (!latest) {
+      throw new Error("沒有可撤銷的動作。");
+    }
+    if (latest.action === "claim" && latest.receiptLineId) {
+      // Reverse a claim → unclaim.
+      const { toggleClaim } = await import(
+        "@/features/claiming/server/claimRepo"
+      );
+      await toggleClaim({
+        sessionId: linkId,
+        receiptLineId: latest.receiptLineId,
+        identityId: identity.id,
+      });
+    } else if (latest.action === "unclaim" && latest.receiptLineId) {
+      // Reverse an unclaim → re-claim.
+      const { toggleClaim } = await import(
+        "@/features/claiming/server/claimRepo"
+      );
+      await toggleClaim({
+        sessionId: linkId,
+        receiptLineId: latest.receiptLineId,
+        identityId: identity.id,
+      });
+    } else if (
+      latest.action === "weight" &&
+      latest.receiptLineId &&
+      latest.details
+    ) {
+      // Restore previous weight. v1: details only stores the NEW
+      // weight; without the prior value we honestly can't restore
+      // the exact prior. Fall back to weight=1 as the safe default
+      // and document via the change log entry. Story 4.9 hardening
+      // (store prior weight in details) → W-4-9-1.
+      await db
+        .update(claims)
+        .set({ weight: 1 })
+        .where(
+          and(
+            eq(claims.receiptLineId, latest.receiptLineId),
+            eq(claims.identityId, identity.id),
+          ),
+        );
+    } else {
+      throw new Error("沒有可撤銷的動作。");
+    }
+    await appendChange({
+      sessionId: linkId,
+      receiptLineId: latest.receiptLineId,
+      identityId: identity.id,
+      action: "undo",
+      details: { reversed: latest.action, sourceId: latest.id },
+    });
+  } catch (e) {
+    if (
+      e instanceof Error &&
+      [
+        FRIENDLY_INVALID,
+        FRIENDLY_AUTH,
+        FRIENDLY_NOT_FOUND,
+        "沒有可撤銷的動作。",
+      ].includes(e.message)
+    ) {
+      throw e;
+    }
+    console.error(
+      "[undoLastClaimAction] failed:",
       e instanceof Error ? e.message : String(e),
     );
     throw new Error(FRIENDLY_UNEXPECTED);

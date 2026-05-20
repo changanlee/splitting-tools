@@ -9,13 +9,27 @@
  * The board itself is dumb — no polling here (Story 4.8 owns the
  * board polling; we re-use the same server data for now).
  */
+import { useSyncExternalStore } from "react";
+
 import {
   computeSubtotals,
   type ClaimForShare,
   type LineForShare,
 } from "@/features/claiming/shareMath";
 import { ClaimRow } from "@/features/claiming/components/ClaimRow";
+import { undoLastClaimAction } from "@/features/claiming/server/actions";
+import { getOrCreateDeviceToken } from "@/features/identity/deviceToken";
 import { formatCents } from "@/features/reconciliation/lib/formatCents";
+
+function subscribeNoop(): () => void {
+  return () => {};
+}
+function tokenSnap(): string | null {
+  return getOrCreateDeviceToken();
+}
+function tokenServerSnap(): string | null {
+  return null;
+}
 
 interface LineProp {
   id: string;
@@ -65,6 +79,13 @@ export function ClaimBoardBody({
   const pending = lines.filter(
     (l) => !claims.some((c) => c.receiptLineId === l.id),
   );
+
+  const token = useSyncExternalStore(
+    subscribeNoop,
+    tokenSnap,
+    tokenServerSnap,
+  );
+  const undoBound = undoLastClaimAction.bind(null, linkId);
 
   // Group claims by line for the row props.
   const claimsByLine = new Map<string, ClaimProp[]>();
@@ -117,6 +138,19 @@ export function ClaimBoardBody({
           目前有 {pending.length} 行尚未認領（4.7 將更明顯地提醒付款人）。
         </p>
       ) : null}
+      {/* Story 4.6 — undo my last action (claim/unclaim/weight). */}
+      <form action={undoBound} className="self-start">
+        {token ? (
+          <input type="hidden" name="deviceToken" value={token} />
+        ) : null}
+        <button
+          type="submit"
+          disabled={!token}
+          className="text-xs text-primary underline underline-offset-2 hover:no-underline disabled:opacity-50"
+        >
+          ↶ 撤銷上一個動作
+        </button>
+      </form>
     </section>
   );
 }

@@ -56,7 +56,7 @@
 #   each story states its own Drizzle schema DDL.
 
 generated: 2026-05-19
-last_updated: 2026-05-20T08:56
+last_updated: 2026-05-20T10:10
 project: splitting_tools
 project_key: NOKEY
 tracking_system: file-system
@@ -97,18 +97,18 @@ development_status:
   epic-4: in-progress  # started 2026-05-20
   4-1-noauth-entry-device-token: done  # autonomous 2026-05-20
   4-2-identity-picker-name-memory: done  # autonomous 2026-05-20
-  4-3-fix-identity-token-isolation: in-progress  # core last-write-wins shipped; hardening deferred W-4-3-1
+  4-3-fix-identity-token-isolation: deferred  # core last-write-wins shipped; hardening → W-4-3-1
   4-4-claim-toggle-subtotal: done  # autonomous 2026-05-20
   4-5-weighted-multi-claim: done  # autonomous 2026-05-20 — weighted shareMath + per-row weight input
-  4-6-claim-done-undo: in-progress  # autonomous 2026-05-20
-  4-7-pending-race-authority: in-progress  # autonomous 2026-05-20
-  4-8-claim-board-polling: in-progress  # autonomous 2026-05-20
-  4-9-payer-change-log: in-progress  # autonomous 2026-05-20
+  4-6-claim-done-undo: done  # autonomous 2026-05-20 — change-log-backed undo
+  4-7-pending-race-authority: deferred  # pending count UI present; full race arbitration → W-4-7-1
+  4-8-claim-board-polling: deferred  # form revalidation works; React-Query polling → W-4-8-1
+  4-9-payer-change-log: done  # autonomous 2026-05-20 — actions append to claim_changes
   epic-4-retrospective: optional
 
   # ---- Epic 5: 結算與結束 (FR35-42, FR50) ----
-  epic-5: backlog
-  5-1-settlement-deterministic-fn: backlog
+  epic-5: in-progress  # started 2026-05-20 — 5.1 done; 5.2-5.5 deferred
+  5-1-settlement-deterministic-fn: done  # autonomous 2026-05-20 — FR50 invariant gates green
   5-2-settlement-page-trust-thumbnail: backlog
   5-3-plaintext-export: backlog
   5-4-payer-absorb-finalize: backlog
@@ -118,5 +118,5 @@ development_status:
   # ---- Epic 6: 資料生命週期與隱私 (FR44-45) ----
   epic-6: backlog
   6-1-30day-verifiable-destroy: backlog
-  6-2-noindex-anti-discovery: backlog
+  6-2-noindex-anti-discovery: done  # autonomous 2026-05-20 — metadata.robots + robots.ts + middleware X-Robots-Tag triple
   epic-6-retrospective: optional

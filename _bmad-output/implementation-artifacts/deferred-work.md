@@ -343,6 +343,49 @@
   (a Costco receipt is ≪ a few hundred lines). Revisit (chunked
   inserts) only if the page cap is raised or row counts grow.
 
+## Deferred from: Epic 4 autonomous batch (2026-05-20)
+
+- **W-4-3-1** — Story 4.3 (identity-token isolation hardening).
+  Status: OPEN, P2. v1 ships last-write-wins for `mode='pick'` — a
+  second device with a different token that picks an existing
+  identity REBINDS the row to its token (the original device loses
+  authz). Acceptable for the friend-group trust model in v1; harden
+  to "name+token nonce" or require confirmation when the row was
+  bound < N minutes ago. Owner: 4-3 follow-up.
+- **W-4-7-1** — Story 4.7 (pending race authority). Status: OPEN, P2.
+  Pending-line COUNT is surfaced in ClaimBoardBody; full
+  payer-side arbitration UI (highlight unclaimed lines, force-assign
+  via payer, conflict resolution between simultaneous claimers via
+  server-arbitrated last-writer-wins+notify) deferred to follow-up.
+- **W-4-8-1** — Story 4.8 (claim-board polling). Status: OPEN, P2.
+  Current revalidation is form-based (each submit triggers
+  `revalidatePath`). A React-Query 5-10s polling layer over a
+  `GET /api/splits/[linkId]/board` JSON endpoint is the next step
+  for friends watching shares update live. Defer until traffic
+  warrants — for ~3 friends in a Costco trip, form revalidate is
+  sufficient.
+- **W-4-9-1** — Story 4.9 (audit-trail prior-value capture). Status:
+  OPEN, P3. The undo path for `action='weight'` only knows the NEW
+  weight (no prior captured in details). v1 falls back to weight=1
+  on undo. Capture prior in details on `setClaimWeightAction` to
+  make undo exact.
+
+## Deferred — Epic 5 stretch (not started 2026-05-20)
+
+- **Story 5.2** settlement-page-trust-thumbnail — settlement UI
+  surface; backlog.
+- **Story 5.3** plaintext-export — text dump for sharing;
+  backlog.
+- **Story 5.4** payer-absorb-finalize — explicit absorb of pending +
+  finalize session; backlog.
+- **Story 5.5** freeze-readonly-late-joiner — frozen state once
+  finalized; backlog.
+
+## Deferred — Epic 6 stretch (not started 2026-05-20)
+
+- **Story 6.1** 30-day-verifiable-destroy — lifecycleWorker + verified
+  delete (NFR-S4); backlog.
+
 ## Deferred from: code review of story-2.1 (2026-05-20)
 
 - **W-2-1-3** — `linkId` URL-segment shape validation. Status: OPEN,
