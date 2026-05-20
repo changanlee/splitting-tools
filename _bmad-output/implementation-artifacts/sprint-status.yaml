@@ -79,7 +79,7 @@ development_status:
   epic-2: in-progress  # started 2026-05-20
   2-1-reconciliation-display: done  # dev+review 2026-05-20; 4 patches; gate green 122pass2todo
   2-2-suspicious-line-locate: done  # autonomous 2026-05-20; gate green 133pass2todo
-  2-3-line-edit-add-delete: backlog
+  2-3-line-edit-add-delete: done  # autonomous 2026-05-20; gate green 142pass2todo
   2-4-irc-rebind-parent: backlog
   2-5-manual-printed-total: backlog
   2-6-unverified-force-pass: backlog

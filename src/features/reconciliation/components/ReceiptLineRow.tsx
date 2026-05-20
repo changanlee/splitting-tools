@@ -29,9 +29,15 @@ interface Props {
    * absent or `'normal'`, the row renders unchanged from 2.1.
    */
   suspicious?: SuspiciousResult;
+  /**
+   * Story 2.3: when present, renders an 「編輯」 anchor on the row
+   * pointing at the supplied href (typically `?edit=<lineId>`). IRC
+   * rows never get this (re-binding is Story 2.4).
+   */
+  editHref?: string;
 }
 
-export function ReceiptLineRow({ line, suspicious }: Props) {
+export function ReceiptLineRow({ line, suspicious, editHref }: Props) {
   const isSuspicious = suspicious?.severity === "suspicious";
   if (line.isIrc) {
     // IRC discount line: folded into its parent's net by 1.5; render
@@ -129,6 +135,15 @@ export function ReceiptLineRow({ line, suspicious }: Props) {
           </span>
         )}
       </span>
+      {editHref ? (
+        <a
+          href={editHref}
+          className="shrink-0 text-xs text-primary underline underline-offset-2 hover:no-underline"
+          aria-label={`編輯第 ${line.lineNo} 行`}
+        >
+          編輯
+        </a>
+      ) : null}
     </li>
   );
 }

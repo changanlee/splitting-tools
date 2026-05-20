@@ -13,7 +13,9 @@
 import { notFound } from "next/navigation";
 
 import { computeReconciliation } from "@/features/reconciliation/compute";
+import { AddLineForm } from "@/features/reconciliation/components/AddLineForm";
 import { OrphanIrcBanner } from "@/features/reconciliation/components/OrphanIrcBanner";
+import { ReceiptLineEditForm } from "@/features/reconciliation/components/ReceiptLineEditForm";
 import { ReceiptLineRow } from "@/features/reconciliation/components/ReceiptLineRow";
 import { StickySubtotalBar } from "@/features/reconciliation/components/StickySubtotalBar";
 import { SuspiciousSummary } from "@/features/reconciliation/components/SuspiciousSummary";
@@ -26,10 +28,12 @@ import {
 
 interface Ctx {
   params: Promise<{ linkId: string }>;
+  searchParams: Promise<{ edit?: string }>;
 }
 
-export default async function ReviewPage({ params }: Ctx) {
+export default async function ReviewPage({ params, searchParams }: Ctx) {
   const { linkId } = await params;
+  const { edit: editingLineId } = await searchParams;
 
   let summary: Awaited<ReturnType<typeof getReconciliationSummary>>;
   try {
@@ -107,16 +111,30 @@ export default async function ReviewPage({ params }: Ctx) {
         核對逐行品項
       </h1>
       <ol className="flex-1" aria-label="收據逐行品項">
-        {summary.lines.map((l) => (
-          <ReceiptLineRow
-            key={l.id}
-            line={l}
-            suspicious={suspiciousByLine.get(l.id)}
-          />
-        ))}
+        {summary.lines.map((l) =>
+          // Story 2.3 — editing variant: ?edit=<lineId> swaps that row
+          // for the inline edit/delete form. Only non-IRC product
+          // rows are editable here (IRC re-binding is Story 2.4).
+          editingLineId === l.id && !l.isIrc ? (
+            <ReceiptLineEditForm key={l.id} linkId={linkId} line={l} />
+          ) : (
+            <ReceiptLineRow
+              key={l.id}
+              line={l}
+              suspicious={suspiciousByLine.get(l.id)}
+              editHref={
+                !l.isIrc && !editingLineId
+                  ? `/splits/${linkId}/review?edit=${l.id}`
+                  : undefined
+              }
+            />
+          ),
+        )}
       </ol>
+      {/* Story 2.3 — append a new product line. */}
+      <AddLineForm linkId={linkId} />
       <footer className="px-4 py-4 text-xs text-muted-foreground border-t">
-        Story 2.1 顯示 only。可疑行（2-2）／編輯增刪（2-3）／IRC 改綁（2-4）／
+        Story 2.1/2.2/2.3 完成（顯示／可疑行／編輯增刪）。IRC 改綁（2-4）／
         手動印製總額（2-5）／未驗證放行（2-6）／前進保證（2-7）由後續 story 接續。
       </footer>
     </main>
