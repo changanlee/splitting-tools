@@ -52,8 +52,6 @@ export function MessageCard({
         <dd className="tabular-nums font-medium">{formatCents(totalToShow, { currency })}</dd>
         <dt className="text-muted-foreground">品項</dt>
         <dd>{lineCount} 行</dd>
-        <dt className="text-muted-foreground">付款人</dt>
-        <dd className="text-muted-foreground italic">（未設定，Epic 4 處理）</dd>
         {unverified ? (
           <>
             <dt className="text-amber-700 dark:text-amber-300">⚠</dt>

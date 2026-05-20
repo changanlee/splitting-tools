@@ -56,9 +56,8 @@ export default async function SharePage({ params }: Ctx) {
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
   const proto = h.get("x-forwarded-proto") ?? "https";
   const origin = host ? `${proto}://${host}` : "";
-  // Story 4.1 will own /splits/[linkId]/claim. Until then point at
-  // /review (already shipped) so the URL is always valid.
-  const sharePath = `/splits/${linkId}/review`;
+  // Share link points to the friend-facing claim entry (Story 4.1).
+  const sharePath = `/splits/${linkId}/claim`;
   const shareUrl = `${origin}${sharePath}`;
 
   const cardProps = {
