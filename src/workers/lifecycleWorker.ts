@@ -14,6 +14,12 @@ const LIFECYCLE_QUEUE = "lifecycle-destroy";
 const LIFECYCLE_CRON = "0 3 * * *";
 
 export async function registerLifecycleWorker(boss: PgBoss): Promise<void> {
+  // pg-boss v12: queue must exist before `work(...)` / `schedule(...)`.
+  try {
+    await boss.createQueue(LIFECYCLE_QUEUE);
+  } catch (e) {
+    console.warn("[lifecycleWorker] createQueue:", e);
+  }
   await boss.work(LIFECYCLE_QUEUE, async () => {
     const start = Date.now();
     try {

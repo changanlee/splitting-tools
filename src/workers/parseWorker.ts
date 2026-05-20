@@ -36,6 +36,15 @@ const FRIENDLY_UNEXPECTED =
   "收據解析暫時失敗，請稍後再試一次。";
 
 export async function registerParseWorker(boss: PgBoss): Promise<void> {
+  // pg-boss v12: queue must exist before `work(...)` can subscribe.
+  // Idempotent — the producer (queue.ts) ensures it too; safe either
+  // start order. A real init failure here would otherwise surface
+  // as the misleading "Queue parse does not exist" runtime error.
+  try {
+    await boss.createQueue(PARSE_QUEUE);
+  } catch (e) {
+    console.warn("[parseWorker] createQueue:", e);
+  }
   await boss.work(
     PARSE_QUEUE,
     async (jobs: { id: string; data: ParseJobPayload }[]) => {
