@@ -14,6 +14,7 @@ import { notFound } from "next/navigation";
 
 import { computeReconciliation } from "@/features/reconciliation/compute";
 import { AddLineForm } from "@/features/reconciliation/components/AddLineForm";
+import { ForcePassForm } from "@/features/reconciliation/components/ForcePassForm";
 import { IrcRebindForm } from "@/features/reconciliation/components/IrcRebindForm";
 import { OrphanIrcBanner } from "@/features/reconciliation/components/OrphanIrcBanner";
 import { PrintedTotalForm } from "@/features/reconciliation/components/PrintedTotalForm";
@@ -21,6 +22,7 @@ import { ReceiptLineEditForm } from "@/features/reconciliation/components/Receip
 import { ReceiptLineRow } from "@/features/reconciliation/components/ReceiptLineRow";
 import { StickySubtotalBar } from "@/features/reconciliation/components/StickySubtotalBar";
 import { SuspiciousSummary } from "@/features/reconciliation/components/SuspiciousSummary";
+import { UnverifiedBanner } from "@/features/reconciliation/components/UnverifiedBanner";
 import { getReconciliationSummary } from "@/features/reconciliation/server/summary";
 import {
   buildSuspiciousContext,
@@ -79,6 +81,7 @@ export default async function ReviewPage({ params, searchParams }: Ctx) {
   const reconciliation = computeReconciliation(
     summary.parsedSumCents,
     summary.printedTotalCents,
+    summary.unverified, // Story 2.6
   );
 
   const orphanCount = summary.lines.filter((l) => l.orphan).length;
@@ -103,6 +106,8 @@ export default async function ReviewPage({ params, searchParams }: Ctx) {
         parsedSumCents={summary.parsedSumCents}
         reconciliation={reconciliation}
       />
+      {/* Story 2.6 — unverified force-pass banner (FR15 propagation). */}
+      <UnverifiedBanner unverified={summary.unverified} />
       {/* Review P3: even when SubtotalBar reads 'verified' (green ✓),
           orphan IRCs mean per-line attribution is incomplete — surface
           that fact next to the trust signal so it can't be missed. */}
@@ -157,9 +162,14 @@ export default async function ReviewPage({ params, searchParams }: Ctx) {
       />
       {/* Story 2.3 — append a new product line. */}
       <AddLineForm linkId={linkId} />
+      {/* Story 2.6 — FR14 escape hatch (二次確認 + 明示後果). */}
+      <ForcePassForm
+        linkId={linkId}
+        currentlyUnverified={summary.unverified}
+      />
       <footer className="px-4 py-4 text-xs text-muted-foreground border-t">
-        Story 2.1/2.2/2.3 完成（顯示／可疑行／編輯增刪）。IRC 改綁（2-4）／
-        手動印製總額（2-5）／未驗證放行（2-6）／前進保證（2-7）由後續 story 接續。
+        Stories 2.1–2.6 完成。前進保證（2-7）／連結（Epic 3）／認領（Epic 4）／
+        結算（Epic 5）／生命週期（Epic 6）由後續 story 接續。
       </footer>
     </main>
   );

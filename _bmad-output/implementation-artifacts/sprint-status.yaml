@@ -82,7 +82,7 @@ development_status:
   2-3-line-edit-add-delete: done  # autonomous 2026-05-20; gate green 142pass2todo
   2-4-irc-rebind-parent: done  # autonomous 2026-05-20; gate green 147pass2todo
   2-5-manual-printed-total: done  # autonomous 2026-05-20
-  2-6-unverified-force-pass: backlog
+  2-6-unverified-force-pass: done  # autonomous 2026-05-20
   2-7-never-deadlock-guarantee: backlog
   epic-2-retrospective: optional
 

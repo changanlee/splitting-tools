@@ -56,3 +56,31 @@ describe("computeReconciliation — three states (AC1)", () => {
     });
   });
 });
+
+describe("computeReconciliation — Story 2.6 unverified override (FR14)", () => {
+  it("unverified=true overrides the math regardless of inputs", () => {
+    // With mismatch underneath
+    expect(computeReconciliation(220850, 220000, true)).toEqual({
+      state: "unverified",
+      mismatchCents: 850,
+    });
+    // With awaiting underneath
+    expect(computeReconciliation(220850, null, true)).toEqual({
+      state: "unverified",
+      mismatchCents: null,
+    });
+    // With verified underneath (payer chose force-pass anyway)
+    expect(computeReconciliation(220850, 220850, true)).toEqual({
+      state: "unverified",
+      mismatchCents: 0,
+    });
+  });
+
+  it("unverified=false (default) preserves prior three-state behavior", () => {
+    expect(computeReconciliation(220850, 220850).state).toBe("verified");
+    expect(computeReconciliation(220850, 220000).state).toBe("mismatch");
+    expect(computeReconciliation(220850, null).state).toBe(
+      "awaiting_printed_total",
+    );
+  });
+});

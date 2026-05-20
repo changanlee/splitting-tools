@@ -209,6 +209,51 @@ import { recomputeNets } from "@/features/reconciliation/recompute";
  * otherwise must parse as positive integer cents. revalidatePath so
  * SubtotalBar swaps state on the next render.
  */
+/**
+ * Story 2.6 — force-pass into "未經對帳驗證" (FR14). The form MUST
+ * carry `confirmed=yes` (a second-click confirm flag) — single
+ * accidental clicks are rejected as invalid input.
+ *
+ * Toggle: passing `confirmed=undo` clears the flag (back to normal
+ * reconciliation states). Allows the payer to recover if they hit
+ * force-pass by mistake.
+ */
+export async function forcePassUnverifiedAction(
+  linkId: string,
+  formData: FormData,
+): Promise<void> {
+  const confirmed = String(formData.get("confirmed") ?? "");
+  let unverified: boolean;
+  if (confirmed === "yes") {
+    unverified = true;
+  } else if (confirmed === "undo") {
+    unverified = false;
+  } else {
+    throw new Error(FRIENDLY_INVALID);
+  }
+
+  try {
+    await assertSession(linkId);
+    await db
+      .update(sessions)
+      .set({ unverified, updatedAt: new Date() })
+      .where(eq(sessions.id, linkId));
+  } catch (e) {
+    if (
+      e instanceof Error &&
+      (e.message === FRIENDLY_NOT_FOUND || e.message === FRIENDLY_INVALID)
+    ) {
+      throw e;
+    }
+    console.error(
+      "[forcePassUnverifiedAction] failed:",
+      e instanceof Error ? e.message : String(e),
+    );
+    throw new Error(FRIENDLY_UNEXPECTED);
+  }
+  revalidatePath(`/splits/${linkId}/review`);
+}
+
 export async function setPrintedTotalAction(
   linkId: string,
   formData: FormData,

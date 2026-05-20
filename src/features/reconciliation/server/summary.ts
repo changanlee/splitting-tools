@@ -30,6 +30,8 @@ export interface ReconciliationSummary {
   sessionId: string;
   parsedSumCents: number; // Σ gross_cents (1.5 AC6 — derived, not stored)
   printedTotalCents: number | null;
+  /** Story 2.6 — payer has chosen the FR14 force-pass escape hatch. */
+  unverified: boolean;
   lines: ReceiptLineView[];
 }
 
@@ -45,6 +47,7 @@ export async function getReconciliationSummary(
     .select({
       id: sessions.id,
       printedTotalCents: sessions.printedTotalCents,
+      unverified: sessions.unverified,
     })
     .from(sessions)
     .where(eq(sessions.id, linkId))
@@ -84,6 +87,7 @@ export async function getReconciliationSummary(
     sessionId: sess.id,
     parsedSumCents,
     printedTotalCents: sess.printedTotalCents,
+    unverified: sess.unverified,
     lines: lineRows,
   };
 }

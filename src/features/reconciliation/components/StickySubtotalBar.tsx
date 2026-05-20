@@ -41,6 +41,12 @@ const STATE_STYLES = {
     icon: "⏳",
     iconLabel: "待輸入印製總額",
   },
+  unverified: {
+    container:
+      "bg-amber-50 text-amber-900 border-amber-200 dark:bg-amber-950/40 dark:text-amber-100 dark:border-amber-900",
+    icon: "⚠",
+    iconLabel: "未經對帳驗證",
+  },
 } as const;
 
 export function StickySubtotalBar({ parsedSumCents, reconciliation }: Props) {
@@ -53,11 +59,20 @@ export function StickySubtotalBar({ parsedSumCents, reconciliation }: Props) {
   } else if (reconciliation.state === "mismatch") {
     const delta = reconciliation.mismatchCents ?? 0;
     const absDeltaText = formatCents(Math.abs(delta));
-    // Review P4: spell out the framing instead of bare "（多/少）" —
-    // a payer reading "差 NT$5（多）" couldn't tell whether parsed or
-    // printed is the bigger number. "解析比印製多/少" removes that.
     const framing = delta > 0 ? "解析比印製多" : "解析比印製少";
     detail = `解析 ${parsedText}  ${framing} ${absDeltaText}`;
+  } else if (reconciliation.state === "unverified") {
+    // Story 2.6 — explicit "未經對帳驗證" override. Show the
+    // underlying delta if available so the payer can still see what
+    // they bypassed.
+    const delta = reconciliation.mismatchCents;
+    if (delta !== null && delta !== 0) {
+      const absDeltaText = formatCents(Math.abs(delta));
+      const framing = delta > 0 ? "解析比印製多" : "解析比印製少";
+      detail = `⚠ 未經對帳驗證 · 解析 ${parsedText}（${framing} ${absDeltaText}）`;
+    } else {
+      detail = `⚠ 未經對帳驗證 · 解析 ${parsedText}`;
+    }
   } else {
     detail = `解析 ${parsedText} · 待輸入印製總額（Story 2.5 處理）`;
   }
