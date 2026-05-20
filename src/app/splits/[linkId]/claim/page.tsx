@@ -11,10 +11,8 @@
  */
 import { notFound } from "next/navigation";
 
-import { ClaimBoardBody } from "@/features/claiming/components/ClaimBoardBody";
-import { MyIdentityResolver } from "@/features/claiming/components/MyIdentityResolver";
+import { ClaimPageBody } from "@/features/claiming/components/ClaimPageBody";
 import { listClaims } from "@/features/claiming/server/claimRepo";
-import { IdentityPicker } from "@/features/identity/components/IdentityPicker";
 import { listIdentities } from "@/features/identity/server/identityRepo";
 import { getReconciliationSummary } from "@/features/reconciliation/server/summary";
 import { sessionExists } from "@/features/parsing/server/jobs";
@@ -54,34 +52,25 @@ export default async function ClaimPage({ params }: Ctx) {
           勾選你吃的品項；同一品項多人勾選可設定份額（4.5 加權）。
         </p>
       </header>
-      <MyIdentityResolver
+      <ClaimPageBody
+        linkId={linkId}
         identities={identitiesForResolve}
-        fallback={
-          <IdentityPicker linkId={linkId} existing={existing} />
-        }
-      >
-        {({ id: myIdentityId, name: myName }) => (
-          <ClaimBoardBody
-            linkId={linkId}
-            myIdentityId={myIdentityId}
-            myName={myName}
-            lines={lines.map((l) => ({
-              id: l.id,
-              lineNo: l.lineNo,
-              description: l.description,
-              netCents: l.netCents,
-            }))}
-            claims={claimsAll.map((c) => ({
-              receiptLineId: c.receiptLineId,
-              identityId: c.identityId,
-              identityName: c.identityName,
-              weight: c.weight,
-            }))}
-            unverified={summary?.unverified ?? false}
-            currency={summary?.currency ?? null}
-          />
-        )}
-      </MyIdentityResolver>
+        existing={existing}
+        lines={lines.map((l) => ({
+          id: l.id,
+          lineNo: l.lineNo,
+          description: l.description,
+          netCents: l.netCents,
+        }))}
+        claims={claimsAll.map((c) => ({
+          receiptLineId: c.receiptLineId,
+          identityId: c.identityId,
+          identityName: c.identityName,
+          weight: c.weight,
+        }))}
+        unverified={summary?.unverified ?? false}
+        currency={summary?.currency ?? null}
+      />
     </main>
   );
 }

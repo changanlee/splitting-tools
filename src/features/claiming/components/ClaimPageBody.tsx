@@ -1,15 +1,16 @@
 "use client";
 
 /**
- * Story 4.1/4.2/4.4 — resolves the current device's identity from
- * localStorage's token. Reads the prop list of (id, hash) and finds
- * the matching identity client-side. Token never goes back to the
- * server here; the identity ID is then threaded into ClaimRow as a
- * plain string. If no match → renders the children fallback (the
- * page passes an IdentityPicker for that branch).
+ * Client entry for the claim page. Owns the device-token-based
+ * identity resolution and the picker-vs-board conditional render in
+ * one place, so the Server Component (`/splits/[linkId]/claim/page`)
+ * only has to pass plain serialisable props — no render-prop function
+ * crossing the RSC boundary (Next 16 forbids that).
  */
-import { useEffect, useReducer, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useReducer, useSyncExternalStore } from "react";
 
+import { ClaimBoardBody } from "@/features/claiming/components/ClaimBoardBody";
+import { IdentityPicker } from "@/features/identity/components/IdentityPicker";
 import { getOrCreateDeviceToken } from "@/features/identity/deviceToken";
 
 function subscribeNoop(): () => void {
@@ -30,10 +31,39 @@ async function hashHex(s: string): Promise<string> {
     .join("");
 }
 
+interface ClaimerForBoard {
+  receiptLineId: string;
+  identityId: string;
+  identityName: string;
+  weight: number;
+}
+
+interface LineForBoard {
+  id: string;
+  lineNo: number;
+  description: string;
+  netCents: number;
+}
+
+interface IdentityForResolve {
+  id: string;
+  name: string;
+  deviceTokenHash: string;
+}
+
+interface Existing {
+  id: string;
+  name: string;
+}
+
 interface Props {
-  identities: { id: string; name: string; deviceTokenHash: string }[];
-  fallback: ReactNode;
-  children: (args: { id: string; name: string }) => ReactNode;
+  linkId: string;
+  identities: IdentityForResolve[];
+  existing: Existing[];
+  lines: LineForBoard[];
+  claims: ClaimerForBoard[];
+  unverified: boolean;
+  currency: string | null;
 }
 
 type ResolveState =
@@ -55,7 +85,15 @@ function reducer(_state: ResolveState, action: ResolveAction): ResolveState {
   }
 }
 
-export function MyIdentityResolver({ identities, fallback, children }: Props) {
+export function ClaimPageBody({
+  linkId,
+  identities,
+  existing,
+  lines,
+  claims,
+  unverified,
+  currency,
+}: Props) {
   const token = useSyncExternalStore(
     subscribeNoop,
     getTokenSnap,
@@ -88,10 +126,20 @@ export function MyIdentityResolver({ identities, fallback, children }: Props) {
   }, [token, identities]);
 
   if (state.status === "pending") {
-    return (
-      <p className="text-sm text-muted-foreground">正在確認你的身份…</p>
-    );
+    return <p className="text-sm text-muted-foreground">正在確認你的身份…</p>;
   }
-  if (state.id === null) return <>{fallback}</>;
-  return <>{children({ id: state.id, name: state.name })}</>;
+  if (state.id === null) {
+    return <IdentityPicker linkId={linkId} existing={existing} />;
+  }
+  return (
+    <ClaimBoardBody
+      linkId={linkId}
+      myIdentityId={state.id}
+      myName={state.name}
+      lines={lines}
+      claims={claims}
+      unverified={unverified}
+      currency={currency}
+    />
+  );
 }
