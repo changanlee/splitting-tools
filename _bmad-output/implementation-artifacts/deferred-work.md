@@ -208,7 +208,37 @@
 
 ## W-1-4-1 — Story 1.4 real vision-LLM runtime verification
 
-- **Status:** OPEN (provider migrated 2026-05-20: Anthropic SDK → OpenRouter)
+- **Status:** ⚠️ **PARTIALLY RESOLVED 2026-05-20** — vision-LLM runtime +
+  OpenRouter migration GREEN against **a** real multi-page receipt; the
+  **specific Taiwan #5564 ground-truth** still NOT verified (the smoke
+  receipt was a 中國大陸 Costco, item names in 簡體中文 — not the
+  Taiwan-spec fixture the placeholder anchor is named for). The
+  regression `it.todo` REMAINS gated; honest non-silent split below.
+  - **Resolved portion (smoke against a real 2-page CN-Costco receipt
+    via `http://172.20.10.3:3010` from iPhone over LAN; docker compose):**
+    - parse_jobs `7919e058…` → `succeeded` in 33s wall (9.1s vision call)
+    - 28 lines persisted; 3 IRC discounts attributed (#8511322 → line 4,
+      #8519804 → line 9, #8511865 → line 19); pre-IRC gross = 220,850
+      cents, post-IRC net = **213,150 cents** (~NT$2,131.50 if read as
+      hundredths)
+    - llm_costs row: `model=anthropic/claude-sonnet-4.6`, `prompt=3681`,
+      `completion=1594`, `cost_usd=0.034953`, `success=t` — confirms the
+      OpenRouter slug path (no leftover Anthropic-direct call)
+    - Cost preference: live `usage.cost` (markup-inclusive) honoured
+    - Single-attempt success on primary; no fallback to Haiku triggered;
+      no degraded write; friendly-error path NOT exercised this run
+    - Pre-flight bug found+fixed: pg-boss v12 requires `createQueue`
+      before `work`; worker exited (1) silently within seconds of boot
+      until commit `3cca628` added the idempotent create on both
+      `parseWorker` and `lifecycleWorker`.
+  - **Still OPEN (W-1-4-1b):** the spec's #5564 anchor (`220_850` cents
+    in `regression-invariants.test.ts`) is a **Taiwan** receipt. Need
+    one upload of an actual TW #5564 to fill the `it.todo`, plus an
+    induced failure to exercise the friendly-`parse_jobs.error` path
+    + the haiku fallback chain (NFR-R1). Whether the #5564 anchor itself
+    needs revisiting — it might have been authored from the pre-IRC
+    gross of a different physical receipt — is a separate decision
+    (don't unilaterally rename the anchor).
 - **Priority:** P1
 - **Story:** 1-4-vision-llm-parse (AC2/AC3/AC5/AC9)
 - **Gap:** no `OPENROUTER_API_KEY` in the autonomous env, so the actual
