@@ -16,7 +16,13 @@ import { computeReconciliation } from "@/features/reconciliation/compute";
 import { OrphanIrcBanner } from "@/features/reconciliation/components/OrphanIrcBanner";
 import { ReceiptLineRow } from "@/features/reconciliation/components/ReceiptLineRow";
 import { StickySubtotalBar } from "@/features/reconciliation/components/StickySubtotalBar";
+import { SuspiciousSummary } from "@/features/reconciliation/components/SuspiciousSummary";
 import { getReconciliationSummary } from "@/features/reconciliation/server/summary";
+import {
+  buildSuspiciousContext,
+  classifySuspicious,
+  type SuspiciousResult,
+} from "@/features/reconciliation/suspicious";
 
 interface Ctx {
   params: Promise<{ linkId: string }>;
@@ -71,6 +77,20 @@ export default async function ReviewPage({ params }: Ctx) {
 
   const orphanCount = summary.lines.filter((l) => l.orphan).length;
 
+  // Story 2.2 — compute suspicious classification once, server-side.
+  // Pass per-line results into ReceiptLineRow and collect line-nos
+  // for the SuspiciousSummary anchor list.
+  const suspiciousCtx = buildSuspiciousContext(summary.lines);
+  const suspiciousByLine = new Map<string, SuspiciousResult>();
+  const suspiciousLineNos: number[] = [];
+  for (const l of summary.lines) {
+    const r = classifySuspicious(l, suspiciousCtx);
+    if (r.severity === "suspicious") {
+      suspiciousByLine.set(l.id, r);
+      suspiciousLineNos.push(l.lineNo);
+    }
+  }
+
   return (
     <main className="min-h-dvh max-w-md mx-auto flex flex-col">
       <StickySubtotalBar
@@ -81,12 +101,18 @@ export default async function ReviewPage({ params }: Ctx) {
           orphan IRCs mean per-line attribution is incomplete — surface
           that fact next to the trust signal so it can't be missed. */}
       <OrphanIrcBanner orphanCount={orphanCount} />
+      {/* Story 2.2 — anchor list to suspicious rows (FR9). */}
+      <SuspiciousSummary suspiciousLineNos={suspiciousLineNos} />
       <h1 className="px-4 pt-4 pb-2 text-base font-semibold">
         核對逐行品項
       </h1>
       <ol className="flex-1" aria-label="收據逐行品項">
         {summary.lines.map((l) => (
-          <ReceiptLineRow key={l.id} line={l} />
+          <ReceiptLineRow
+            key={l.id}
+            line={l}
+            suspicious={suspiciousByLine.get(l.id)}
+          />
         ))}
       </ol>
       <footer className="px-4 py-4 text-xs text-muted-foreground border-t">

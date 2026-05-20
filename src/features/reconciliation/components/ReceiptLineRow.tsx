@@ -18,12 +18,21 @@ import { cn } from "@/lib/utils";
 
 import { formatCents } from "@/features/reconciliation/lib/formatCents";
 import type { ReceiptLineView } from "@/features/reconciliation/server/summary";
+import type { SuspiciousResult } from "@/features/reconciliation/suspicious";
 
 interface Props {
   line: ReceiptLineView;
+  /**
+   * Story 2.2: optional suspicious-line classification result.
+   * When `severity==='suspicious'`, the row gets an amber border-left
+   * marker + ⚠ icon + 「可疑」 text (a11y triple encoding); when
+   * absent or `'normal'`, the row renders unchanged from 2.1.
+   */
+  suspicious?: SuspiciousResult;
 }
 
-export function ReceiptLineRow({ line }: Props) {
+export function ReceiptLineRow({ line, suspicious }: Props) {
+  const isSuspicious = suspicious?.severity === "suspicious";
   if (line.isIrc) {
     // IRC discount line: folded into its parent's net by 1.5; render
     // as a small attribution row under the parent's slot in the list.
@@ -68,10 +77,33 @@ export function ReceiptLineRow({ line }: Props) {
     <li
       role="listitem"
       data-line-type="product"
-      className="px-4 py-2 flex items-center gap-3 border-t first:border-t-0 border-border"
+      data-suspicious={isSuspicious ? "true" : undefined}
+      id={`line-${line.lineNo}`}
+      className={cn(
+        "px-4 py-2 flex items-center gap-3 border-t first:border-t-0 border-border",
+        // Anchor offset for #line-N jumps: avoid being covered by the
+        // sticky subtotal bar at the top (review P3 / Story 2.2 AC3).
+        "scroll-mt-20",
+        isSuspicious &&
+          "border-l-4 border-l-amber-500 bg-amber-50 dark:bg-amber-950/30",
+      )}
     >
+      {isSuspicious ? (
+        <span
+          aria-label="可疑行"
+          title={suspicious?.flags.join(", ")}
+          className="shrink-0 text-amber-700 dark:text-amber-300 text-lg leading-none"
+        >
+          ⚠
+        </span>
+      ) : null}
       <span className="flex-1 min-w-0">
         <span className="block text-sm font-medium">{line.description}</span>
+        {isSuspicious ? (
+          <span className="block text-xs text-amber-700 dark:text-amber-300 font-medium">
+            可疑（{suspicious!.flags.join("、")}）
+          </span>
+        ) : null}
         {line.rawText ? (
           <span className="block text-xs text-muted-foreground truncate">
             {line.rawText}
