@@ -343,6 +343,23 @@
   (a Costco receipt is ≪ a few hundred lines). Revisit (chunked
   inserts) only if the page cap is raised or row counts grow.
 
+## Deferred from: Story 2.1 (2026-05-20)
+
+- **W-2-1-1** — Sticky/visual smoke on real mobile. Status: OPEN,
+  Priority: P3 (post-deploy). `StickySubtotalBar` + readonly review
+  page are Server-Component pure CSS; sticky scroll behaviour, dark-
+  mode rendering, and "賣場 single-glance" usability need an actual
+  device pass once a session exists in a deployed env. Algorithm
+  proven by `compute.test.ts` / `formatCents.test.ts`; UI verifies
+  via build + manual.
+- **W-2-1-2** — End-to-end aggregation accuracy on REAL receipts.
+  Status: OPEN, gated by `W-1-4-1` / `W-CR-5`. The pure
+  `computeReconciliation` and `formatCents` are node-tested; the SQL
+  read in `getReconciliationSummary` is glue (typecheck + build
+  verified). Real `parsed_sum = Σ gross_cents` accuracy against a
+  live #5564 parse depends on running the full 1.4→1.5 pipeline with
+  an API key (gated W-1-4-1) and was honestly NOT claimed here.
+
 ## Deferred from: Story 1.7 (2026-05-20)
 
 - **W-1-7-1** — `checkParseBudget` fail-OPEN on DB outage (v1 explicit

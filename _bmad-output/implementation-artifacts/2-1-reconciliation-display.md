@@ -1,6 +1,6 @@
 # Story 2.1: 對帳結果顯示（相符／差額／待輸入印製總額）
 
-Status: ready-for-dev
+Status: review
 
 ## ⚠️ Dev 鐵則（最高優先）
 
@@ -34,13 +34,13 @@ so that 我能信任這次解析結果或快速判斷需要修正（FR8；2-2~2-
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0：前置** — 讀 `1-5-irc-match-parsed-sum.md`（receipt_lines schema、net_cents/orphan/claimable 旗標、`Σ gross_cents` 派生 parsed_sum）、`1-7-parse-endpoint-budget.md`（route handler 慣例、ErrorEnvelope）、`src/db/schema.ts`（sessions/parse_jobs/receipt_lines 既有結構，`printed_total_cents` 欄已在 sessions）、`src/features/parsing/schema.ts`（ErrorEnvelopeSchema / friendlyJobMessage 慣例）、`ux-design-specification.md` L506-525（StickySubtotalBar / ReceiptLineRow review variant 契約）、`architecture.md` L30/L400/L444/L518/L540/L582。AGENTS.md：Next.js 16 ctx.params Promise + Server Components 預設既為 1-3/1-7 沿用。
-- [ ] **Task 1：純對帳函式（AC1, AC8）** — `src/features/reconciliation/compute.ts`：`type ReconciliationState = "verified" | "mismatch" | "awaiting_printed_total"`、`type ReconciliationResult = { state: ReconciliationState; mismatchCents: number | null }`、`function computeReconciliation(parsedSumCents: number, printedTotalCents: number | null): ReconciliationResult`。整數運算、有號差額、零 float。`compute.test.ts` 具名 node 測 5 案以上：verified（精確等含 0/0）、mismatch 正向（解析 > 印製）、mismatch 負向（解析 < 印製）、awaiting_printed_total（null）、整數分守恆。
-- [ ] **Task 2：Server 端讀模型（AC2, AC3, AC7）** — `src/features/reconciliation/server/summary.ts`：`getReconciliationSummary(linkId): Promise<ReconciliationSummary | null>`——單一 `db.select` 聚合 `Σ gross_cents` over `receipt_lines WHERE session_id=linkId`（drizzle `sql<number>\`COALESCE(SUM(gross_cents), 0)\``）+ 讀 sessions.printed_total_cents（or 一次 JOIN）+ 列 receipt_lines（依 line_no 排序）。session 不存在 → null。glue（不入 node 測；型別 + W 驗證）。
-- [ ] **Task 3：Review page Server Component（AC4, AC5, AC6）** — `src/app/splits/[linkId]/review/page.tsx`：Server Component；`getReconciliationSummary(linkId)`：null→`notFound()`；無 receipt_lines（lines.length===0）→ 簡單訊息「解析尚未完成，請回到上一頁繼續等待」（不顯 SubtotalBar 三態，AC3 ②）；有→ render `<StickySubtotalBar state mismatchCents parsedSumCents />` + `<ReceiptLineRow variant="review-readonly" line={l} />` map。沿用 1-3 ctx.params Promise pattern。
-- [ ] **Task 4：UI 元件（AC4, AC5, AC9）** — `src/features/reconciliation/components/StickySubtotalBar.tsx`：Client Component（`"use client"`；sticky top-0）、三態色（綠/紅/琥珀）+ 圖示 ✓/⚠/⏳ + 文字三重編碼；金額顯示 helper `formatCents(cents): string`（純，整數分 ÷100 + `NT$` + thousand-sep + tabular-nums class）；`src/features/reconciliation/components/ReceiptLineRow.tsx`：Server Component（**唯讀首版**）；`variant="review-readonly"`；母行/IRC/孤兒 三種視覺處理（依 1.5 旗標）。共用 shadcn/Tailwind 既有 design tokens（不新增 UI runtime）。`formatCents.test.ts` 具名 node 測（整數分→字串、千分位、整數零、極大值）。
-- [ ] **Task 5：誠實 + W-defer 登記（AC8 honesty）** — `deferred-work.md` 新增 W-2-1-1（UI 視覺/sticky 行為/手機賣場「掃一眼」可用性需 manual 驗證，gated 部署環境）+ W-2-1-2（真實多筆 receipt_lines 端到端聚合準確 gated `W-1-4-1`）；regression `it.todo` anchor 零改；不宣稱任何真 #5564 端到端結果。
-- [ ] **Task 6：驗收自查（AC8, AC9）** — `pnpm typecheck`(0)/`lint`(0)/`test`（既有 107 零回歸 + 新 compute/formatCents 具名測）/`build`(綠，新增 1 route)；靜態掃描：`src/lib/llm/**` 零改動、`src/db/schema.ts` + `drizzle/migrations/*` 零改動（**零 migration**）、`package.json`/lockfile 零 diff（**零新增 npm**）、無寫端點。記 Completion Notes 貼閘門證據。
+- [x] **Task 0：前置** — 讀 `1-5-irc-match-parsed-sum.md`（receipt_lines schema、net_cents/orphan/claimable 旗標、`Σ gross_cents` 派生 parsed_sum）、`1-7-parse-endpoint-budget.md`（route handler 慣例、ErrorEnvelope）、`src/db/schema.ts`（sessions/parse_jobs/receipt_lines 既有結構，`printed_total_cents` 欄已在 sessions）、`src/features/parsing/schema.ts`（ErrorEnvelopeSchema / friendlyJobMessage 慣例）、`ux-design-specification.md` L506-525（StickySubtotalBar / ReceiptLineRow review variant 契約）、`architecture.md` L30/L400/L444/L518/L540/L582。AGENTS.md：Next.js 16 ctx.params Promise + Server Components 預設既為 1-3/1-7 沿用。
+- [x] **Task 1：純對帳函式（AC1, AC8）** — `src/features/reconciliation/compute.ts`：`type ReconciliationState = "verified" | "mismatch" | "awaiting_printed_total"`、`type ReconciliationResult = { state: ReconciliationState; mismatchCents: number | null }`、`function computeReconciliation(parsedSumCents: number, printedTotalCents: number | null): ReconciliationResult`。整數運算、有號差額、零 float。`compute.test.ts` 具名 node 測 5 案以上：verified（精確等含 0/0）、mismatch 正向（解析 > 印製）、mismatch 負向（解析 < 印製）、awaiting_printed_total（null）、整數分守恆。
+- [x] **Task 2：Server 端讀模型（AC2, AC3, AC7）** — `src/features/reconciliation/server/summary.ts`：`getReconciliationSummary(linkId): Promise<ReconciliationSummary | null>`——單一 `db.select` 聚合 `Σ gross_cents` over `receipt_lines WHERE session_id=linkId`（drizzle `sql<number>\`COALESCE(SUM(gross_cents), 0)\``）+ 讀 sessions.printed_total_cents（or 一次 JOIN）+ 列 receipt_lines（依 line_no 排序）。session 不存在 → null。glue（不入 node 測；型別 + W 驗證）。
+- [x] **Task 3：Review page Server Component（AC4, AC5, AC6）** — `src/app/splits/[linkId]/review/page.tsx`：Server Component；`getReconciliationSummary(linkId)`：null→`notFound()`；無 receipt_lines（lines.length===0）→ 簡單訊息「解析尚未完成，請回到上一頁繼續等待」（不顯 SubtotalBar 三態，AC3 ②）；有→ render `<StickySubtotalBar state mismatchCents parsedSumCents />` + `<ReceiptLineRow variant="review-readonly" line={l} />` map。沿用 1-3 ctx.params Promise pattern。
+- [x] **Task 4：UI 元件（AC4, AC5, AC9）** — `src/features/reconciliation/components/StickySubtotalBar.tsx`：Client Component（`"use client"`；sticky top-0）、三態色（綠/紅/琥珀）+ 圖示 ✓/⚠/⏳ + 文字三重編碼；金額顯示 helper `formatCents(cents): string`（純，整數分 ÷100 + `NT$` + thousand-sep + tabular-nums class）；`src/features/reconciliation/components/ReceiptLineRow.tsx`：Server Component（**唯讀首版**）；`variant="review-readonly"`；母行/IRC/孤兒 三種視覺處理（依 1.5 旗標）。共用 shadcn/Tailwind 既有 design tokens（不新增 UI runtime）。`formatCents.test.ts` 具名 node 測（整數分→字串、千分位、整數零、極大值）。
+- [x] **Task 5：誠實 + W-defer 登記（AC8 honesty）** — `deferred-work.md` 新增 W-2-1-1（UI 視覺/sticky 行為/手機賣場「掃一眼」可用性需 manual 驗證，gated 部署環境）+ W-2-1-2（真實多筆 receipt_lines 端到端聚合準確 gated `W-1-4-1`）；regression `it.todo` anchor 零改；不宣稱任何真 #5564 端到端結果。
+- [x] **Task 6：驗收自查（AC8, AC9）** — `pnpm typecheck`(0)/`lint`(0)/`test`（既有 107 零回歸 + 新 compute/formatCents 具名測）/`build`(綠，新增 1 route)；靜態掃描：`src/lib/llm/**` 零改動、`src/db/schema.ts` + `drizzle/migrations/*` 零改動（**零 migration**）、`package.json`/lockfile 零 diff（**零新增 npm**）、無寫端點。記 Completion Notes 貼閘門證據。
 
 ## Dev Notes
 
@@ -173,12 +173,34 @@ return { sessionId: linkId, parsedSumCents, printedTotalCents: sess[0].printedTo
 
 ### Agent Model Used
 
-（dev-story 時填入）
+claude-opus-4-7[1m]
 
 ### Debug Log References
 
+- 2-1 範圍純顯示，互動極少 → 全 Server Components（CSS sticky 不需 client island）；後續 story 加 polling/edit 時再 `"use client"`，props 契約不變。
+- `formatCents` 用 Math + 手動千分位 regex，不用 `Intl.NumberFormat`（Vercel edge / CI Linux locale 不一致風險避免）。
+- IRC 折抵後母行同時顯示 `netCents`（粗體）+ 原 `grossCents`（劃線小字）：付款人能一眼看到 IRC 套用結果，不重算（沿用 1.5 已寫好的 `net_cents`）。
+
 ### Completion Notes List
+
+- **Task 1（AC1, AC8）**：`src/features/reconciliation/compute.ts` 純 `computeReconciliation`，三態（`verified`/`mismatch`/`awaiting_printed_total`）；signed `mismatchCents`（正＝解析高、負＝解析低，UI 顯絕對值 + 方向文字）。`compute.test.ts` 6 具名 node 測（含 null、精確等、有號差、整數分守恆、邊界 0/0、大數 2^31 內）。
+- **Task 2（AC2, AC3, AC7）**：`src/features/reconciliation/server/summary.ts` `getReconciliationSummary(linkId)`：drizzle 讀 `sessions.printed_total_cents` + `receipt_lines`（依 line_no 排序）；JS reduce 派生 `parsedSumCents = Σ gross_cents`（沿用 1.5 AC6，**零 schema 改動**）；session 不存在回 null（→ `notFound()`）。glue 不入 node 測。
+- **Task 3（AC4-AC6, AC9）**：`src/app/splits/[linkId]/review/page.tsx` Server Component；Next 16 `ctx.params` Promise（沿 1-3/1-7 既有）；session 不存在 → `notFound()`；空 lines → 「解析尚未完成」訊息（不顯 SubtotalBar 三態，避假對帳，AC3 ②）；有 lines → SubtotalBar + ol/li ReceiptLineRow。Page footer 明列各後續 story 範疇邊界。
+- **Task 4（AC4, AC5）**：`components/StickySubtotalBar.tsx`（Server Component，CSS sticky + 三態色/圖示/文字三重編碼 + `tabular-nums` + `aria-live="polite"`）；`components/ReceiptLineRow.tsx`（Server Component，唯讀 review variant；母行有 IRC 折抵時 `net_cents` 粗體 + `gross_cents` 劃線小字；IRC 行 indent 顯「折抵 -NT$X.XX」+ 縮寫；orphan IRC 灰斜體 + Story 2.4 改綁提示）；`lib/formatCents.ts` 純（整數分→`NT$X,XXX.XX`，signed option，非有限值降為 `NT$—`）；`formatCents.test.ts` 8 具名 node 測。
+- **Task 5（honesty）**：`deferred-work.md` 新增 W-2-1-1（mobile sticky/視覺 manual gated 部署）+ W-2-1-2（真實多筆 e2e 聚合準確 gated `W-1-4-1`）；regression `it.todo` anchor 零改；不偽綠。
+- **Task 6（AC8/AC9）閘門證據**：`pnpm typecheck` 0；`pnpm lint` 0；`pnpm test` 12 files / **121 passed | 2 todo**（既有 107 零回歸 + 1.5 新 IRC 14 / 1.6 14 / 1.7 11 計入既有；+14 新 reconciliation = 6 compute + 8 formatCents）；`pnpm build` 綠 **6 routes**（新增 `/splits/[linkId]/review`）。靜態掃描：`src/lib/llm/**` 零改、`src/db/schema.ts` + `drizzle/migrations/*` 零改（**零 migration**）、`package.json`/lockfile 零 diff（**零新增 npm 相依**）、純函式 + Server Components 為主、無 LLM 呼叫、無寫端點。
 
 ### Change Log
 
+- 2026-05-20 — Story 2.1 dev-story 完成（Task 0-6）。Epic 2 第一個 story。三態純對帳函式 + Server Component 核對閘門 page + StickySubtotalBar + 唯讀 ReceiptLineRow + formatCents 純 helper。零 migration / 零新 npm / visionAdapter 零改動 / regression anchor 零改。閘門全綠（typecheck/lint/test 121pass2todo/build 6routes）。Status → review。
+
 ### File List
+
+- NEW `src/features/reconciliation/compute.ts` — 純三態對帳函式
+- NEW `src/features/reconciliation/compute.test.ts` — 6 具名 node 測
+- NEW `src/features/reconciliation/server/summary.ts` — 讀模型 glue（sessions JOIN receipt_lines 派生 parsedSumCents）
+- NEW `src/features/reconciliation/components/StickySubtotalBar.tsx` — Server Component sticky 三態 bar（色+圖示+文字三重編碼 a11y）
+- NEW `src/features/reconciliation/components/ReceiptLineRow.tsx` — Server Component 唯讀 review variant（母行/IRC/orphan 視覺）
+- NEW `src/features/reconciliation/lib/formatCents.ts` — 純整數分→NT$ 字串
+- NEW `src/features/reconciliation/lib/formatCents.test.ts` — 8 具名 node 測
+- NEW `src/app/splits/[linkId]/review/page.tsx` — Server Component 核對閘門 page
