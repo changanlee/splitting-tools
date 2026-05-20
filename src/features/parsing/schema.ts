@@ -56,16 +56,6 @@ export type ErrorEnvelope = z.infer<typeof ErrorEnvelopeSchema>;
  */
 export const MAX_PARSE_PAGES = 5;
 
-/**
- * Story 1.6 (FR7, v1 hard-lock) — the single friendly message written
- * to `parse_jobs.error` when a parsed receipt is not #5564 same-
- * structure. NFR-R1: friendly only — the internal reject `reason`
- * (independent_tax_line / foreign_currency / …) is for server-side
- * structured logs, NEVER surfaced to the payer.
- */
-export const STRUCTURE_REJECT_MESSAGE =
-  "這張收據的結構目前不支援（v1 僅支援 #5564 同結構收據），暫時無法解析這一張，請確認後再試。";
-
 export interface SubmitParts {
   /** Number of pages the client claims to be sending. */
   pageCount: number;

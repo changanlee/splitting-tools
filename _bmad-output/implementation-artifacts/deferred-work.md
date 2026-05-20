@@ -509,6 +509,9 @@
 ## Deferred from: code review of story-1.6 (2026-05-20)
 
 - **W-CR-9** — structureGuard tax/currency heuristic precision.
+  Status: **VOID 2026-05-20** — FR7 reverted; `structureGuard.ts` deleted
+  along with its tests. The precision concern is moot (no classifier
+  to tune). Kept here as historical record. Original text below:
   Status: OPEN, Priority: P2 (gated by W-1-4-1). `TAX_RE` matches a
   tax substring *anywhere* in `rawText+description`: `tax-free`
   (hyphen is a `\b`), a product name containing `稅額`, or — most

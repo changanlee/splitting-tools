@@ -29,8 +29,6 @@ import {
 import { parseReceiptImages } from "@/lib/llm/visionAdapter";
 import { attributeIrc } from "@/features/parsing/irc";
 import { persistReceiptLines } from "@/features/parsing/server/persistReceiptLines";
-import { classifyReceiptStructure } from "@/features/parsing/structureGuard";
-import { STRUCTURE_REJECT_MESSAGE } from "@/features/parsing/schema";
 
 const FRIENDLY_UNEXPECTED =
   "收據解析暫時失敗，請稍後再試一次。";
@@ -67,34 +65,12 @@ export async function registerParseWorker(boss: PgBoss): Promise<void> {
             { sessionId: data.sessionId, jobId: data.jobId },
           );
           if (outcome.kind === "parsed") {
-            // Story 1.6 (FR7 v1 hard-lock): structure gate BEFORE any
-            // IRC/persist AND before `output` is set. A non-#5564
-            // structure is rejected with the single friendly message
-            // (NFR-R1 — the internal reason is server-log only),
-            // writes NO receipt_lines, and is NOT returned as the
-            // pg-boss job output (a rejected receipt must not look
-            // like a successful parse on the output channel; the
-            // authoritative state is the `failed` parse_jobs row).
-            // This is a NORMAL control-flow branch (not a throw): it
-            // goes through markJobFailed like the visionAdapter-
-            // exhausted path and must not fall into the catch.
-            const structure = classifyReceiptStructure(outcome.receipt);
-            if (!structure.ok) {
-              console.error(
-                "[parseWorker] receipt structure rejected (FR7):",
-                structure.reason,
-              );
-              await markJobFailed(
-                data.jobId,
-                STRUCTURE_REJECT_MESSAGE,
-              ).catch((e) =>
-                console.error(
-                  "[parseWorker] markJobFailed (structure):",
-                  e instanceof Error ? e.message : String(e),
-                ),
-              );
-              continue;
-            }
+            // FR7 hard-lock REVERTED 2026-05-20 — scope simplified to
+            // "OCR any receipt the LLM parses". Any parsed receipt now
+            // proceeds straight to IRC attribution + persist, regardless
+            // of locale / store / tax structure. The defense-in-depth
+            // ParsedReceiptSchema.parse inside visionAdapter still
+            // re-validates the LLM payload shape (NFR-R1).
             output = outcome.receipt; // pg-boss job output (W-1-4-3)
             // Story 1.5: IRC attribution + receipt_lines persistence in
             // the SAME success path (W-1-4-3 hand-off; no cross-process
