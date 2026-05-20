@@ -20,10 +20,14 @@ export function formatCents(
   opts: FormatCentsOptions = {},
 ): string {
   const prefix = opts.prefix ?? "NT$";
-  if (!Number.isFinite(cents)) return `${prefix}—`;
+  // Money guardrail (fail-loud): integer cents only. Non-finite OR
+  // non-integer degrades to em-dash rather than silently rounding —
+  // a half-cent leaking in upstream should surface as a visible bug,
+  // not vanish into truncation drift (review P1).
+  if (!Number.isInteger(cents)) return `${prefix}—`;
 
   const negative = cents < 0;
-  const abs = Math.abs(Math.trunc(cents));
+  const abs = Math.abs(cents);
   const whole = Math.trunc(abs / 100);
   const fraction = abs % 100;
 

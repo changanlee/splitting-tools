@@ -39,6 +39,14 @@ describe("formatCents — integer-cents → NT$ string", () => {
     expect(formatCents(Number.POSITIVE_INFINITY)).toBe("NT$—");
   });
 
+  it("non-integer cents degrades to em-dash (review P1, money guardrail)", () => {
+    // Fractional cents must NOT silently truncate — they would mask
+    // an upstream bug. Fail-loud em-dash matches non-finite behaviour.
+    expect(formatCents(0.5)).toBe("NT$—");
+    expect(formatCents(-150.7)).toBe("NT$—");
+    expect(formatCents(99.99)).toBe("NT$—");
+  });
+
   it("custom prefix is respected", () => {
     expect(formatCents(220850, { prefix: "$" })).toBe("$2,208.50");
   });

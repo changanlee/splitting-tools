@@ -1,6 +1,6 @@
 # Story 2.1: 對帳結果顯示（相符／差額／待輸入印製總額）
 
-Status: review
+Status: done
 
 ## ⚠️ Dev 鐵則（最高優先）
 

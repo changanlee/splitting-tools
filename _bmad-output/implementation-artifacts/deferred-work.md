@@ -343,6 +343,27 @@
   (a Costco receipt is ≪ a few hundred lines). Revisit (chunked
   inserts) only if the page cap is raised or row counts grow.
 
+## Deferred from: code review of story-2.1 (2026-05-20)
+
+- **W-2-1-3** — `linkId` URL-segment shape validation. Status: OPEN,
+  owned by 3-1-unguessable-link. Today `/splits/[linkId]/review` reads
+  `linkId` straight into a Drizzle parameterized `eq(sessions.id, …)`
+  with no length/charset guard. Malformed input causes a Postgres
+  query error swallowed by the page's friendly-error catch — the
+  payer sees "暫時無法載入" indistinguishably from a real outage.
+  Not SQL-injectable (parameterized). Story 3.1 owns link-id format
+  (base64url, ≥128-bit entropy) and should add the regex guard +
+  honest 404 path then; fold into 3-1's AC.
+- **W-2-1-4** — IRC visual grouping (sort children under their parent).
+  Status: OPEN, owned by 2-4-irc-rebind-parent. Currently
+  ReceiptLineRow renders flat by `line_no` ASC, which matches
+  1.5's preserved scan order. For typical #5564 receipts an IRC line
+  follows its parent in scan order so the visual reads correctly,
+  but an out-of-order parse would show 折抵 above the discounted
+  line. Story 2.4 will introduce IRC-rebind UX and is the natural
+  place to ship a `groupIrcUnderParent(lines)` layout helper. Defer
+  the layout polish to that story.
+
 ## Deferred from: Story 2.1 (2026-05-20)
 
 - **W-2-1-1** — Sticky/visual smoke on real mobile. Status: OPEN,

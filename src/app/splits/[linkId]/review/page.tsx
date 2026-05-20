@@ -13,6 +13,7 @@
 import { notFound } from "next/navigation";
 
 import { computeReconciliation } from "@/features/reconciliation/compute";
+import { OrphanIrcBanner } from "@/features/reconciliation/components/OrphanIrcBanner";
 import { ReceiptLineRow } from "@/features/reconciliation/components/ReceiptLineRow";
 import { StickySubtotalBar } from "@/features/reconciliation/components/StickySubtotalBar";
 import { getReconciliationSummary } from "@/features/reconciliation/server/summary";
@@ -68,12 +69,18 @@ export default async function ReviewPage({ params }: Ctx) {
     summary.printedTotalCents,
   );
 
+  const orphanCount = summary.lines.filter((l) => l.orphan).length;
+
   return (
     <main className="min-h-dvh max-w-md mx-auto flex flex-col">
       <StickySubtotalBar
         parsedSumCents={summary.parsedSumCents}
         reconciliation={reconciliation}
       />
+      {/* Review P3: even when SubtotalBar reads 'verified' (green ✓),
+          orphan IRCs mean per-line attribution is incomplete — surface
+          that fact next to the trust signal so it can't be missed. */}
+      <OrphanIrcBanner orphanCount={orphanCount} />
       <h1 className="px-4 pt-4 pb-2 text-base font-semibold">
         核對逐行品項
       </h1>

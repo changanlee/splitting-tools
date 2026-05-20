@@ -53,19 +53,23 @@ export function StickySubtotalBar({ parsedSumCents, reconciliation }: Props) {
   } else if (reconciliation.state === "mismatch") {
     const delta = reconciliation.mismatchCents ?? 0;
     const absDeltaText = formatCents(Math.abs(delta));
-    const direction = delta > 0 ? "多" : "少";
-    detail = `解析 ${parsedText}  差 ${absDeltaText}（${direction}）`;
+    // Review P4: spell out the framing instead of bare "（多/少）" —
+    // a payer reading "差 NT$5（多）" couldn't tell whether parsed or
+    // printed is the bigger number. "解析比印製多/少" removes that.
+    const framing = delta > 0 ? "解析比印製多" : "解析比印製少";
+    detail = `解析 ${parsedText}  ${framing} ${absDeltaText}`;
   } else {
     detail = `解析 ${parsedText} · 待輸入印製總額（Story 2.5 處理）`;
   }
 
   return (
     <div
+      // Review P2: visible text inside the live region is already the
+      // full status; an aria-label on top would make readers announce
+      // the label AND the text. Use role/aria-live alone so the
+      // detail string is the single announcement source.
       role="status"
-      // Live region for screen readers — colour+icon+text triple
-      // encoding (UX L514) plus a polite announce when state changes.
       aria-live="polite"
-      aria-label={`對帳狀態：${s.iconLabel}`}
       className={cn(
         "sticky top-0 z-10 w-full border-b px-4 py-3",
         "flex items-center gap-3 text-base font-medium",
