@@ -8,8 +8,13 @@ export const MODEL_PRICING: Record<
   string,
   { inUsdPerMTok: number; outUsdPerMTok: number }
 > = {
-  "claude-sonnet-4-6": { inUsdPerMTok: 3, outUsdPerMTok: 15 },
-  "claude-haiku-4-5-20251001": { inUsdPerMTok: 1, outUsdPerMTok: 5 },
+  // OpenRouter slugs (post 2026-05-20 migration). Underlying model is
+  // still Anthropic's Sonnet 4.6 / Haiku 4.5 so per-1M-token rates are
+  // unchanged; OpenRouter adds a small markup that the live
+  // `usage.cost` field reflects when returned. This table is the
+  // offline-priced fallback when usage.cost isn't provided.
+  "anthropic/claude-sonnet-4.6": { inUsdPerMTok: 3, outUsdPerMTok: 15 },
+  "anthropic/claude-haiku-4.5": { inUsdPerMTok: 1, outUsdPerMTok: 5 },
 };
 
 export interface TokenUsage {

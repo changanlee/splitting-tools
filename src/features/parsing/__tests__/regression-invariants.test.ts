@@ -43,7 +43,7 @@ describe("regression invariants (#5564)", () => {
   // it (incl. a clearly-labelled SYNTHETIC #5564-structure case →
   // 220850) in `src/features/parsing/irc.test.ts`. The REAL #5564
   // end-to-end assertion still needs verified OCR ground truth + a
-  // live Claude run (no ANTHROPIC_API_KEY here) → honestly stays
+  // live LLM run (no OPENROUTER_API_KEY here) → honestly stays
   // gated: deferred-work W-1-4-1 (real runtime) + W-CR-5 (multi-page
   // n=0). NOT fabricated (W-CR-4). Anchor preserved, not faked green.
   it.todo(

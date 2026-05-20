@@ -1,28 +1,38 @@
 /**
- * visionAdapter — THE single boundary for the only external Claude
- * vision call (Story 1.4). Nothing else in the app may call Anthropic
+ * visionAdapter — THE single boundary for the only external vision LLM
+ * call (Story 1.4). Nothing else in the app may call this provider
  * (architecture L459/L554; enforced by static scan).
+ *
+ * Provider: 2026-05-20 migrated from `@anthropic-ai/sdk` direct to
+ *           **OpenRouter** (OpenAI-compatible Chat Completions). The
+ *           underlying model is unchanged — Anthropic's Sonnet 4.6
+ *           primary + Haiku 4.5 fallback — but OpenRouter handles
+ *           auth/billing/rate so we keep a single provider
+ *           relationship. Raw `fetch` instead of the OpenAI SDK: our
+ *           retry / backoff / cost / fallback logic is custom (see
+ *           retry.ts, cost.ts), the SDK would be a thin HTTP wrapper
+ *           around one POST — and dropping it removes a dep.
  *
  * LLM-Ops wrapper (the 7 non-negotiables, items 1/2/4/5 on-spec here):
  *  - NFR-L1: exp-backoff + jitter retry ≥3 (retry.ts), per model.
- *  - NFR-R1: degradation chain sonnet-4-6 → haiku-4-5 → friendly. Raw
+ *  - NFR-R1: degradation chain sonnet-4.6 → haiku-4.5 → friendly. Raw
  *            LLM/stack errors NEVER leave this module (friendly only).
  *  - NFR-L2: response Zod-validated (ParsedReceiptSchema) — structural
  *            failure is treated like a retryable/degradable error.
  *  - NFR-L3/L5: EVERY attempt writes a structured row to `llm_costs`
  *            (model/tokens/latency/cost/ids/success), per-session-day
- *            aggregatable. Cost via the pure cost.ts.
+ *            aggregatable. Cost via the pure cost.ts — OR uses
+ *            OpenRouter's `usage.cost` when present (more accurate
+ *            because it includes their markup).
  *  - NFR-L4: only called from the worker process (parseWorker), never a
  *            request thread.
  *
- * No ANTHROPIC_API_KEY → friendly degraded result, NEVER crashes the
- * worker (real-Claude runtime verification is deferred → W-1-4-1).
+ * No OPENROUTER_API_KEY → friendly degraded result, NEVER crashes the
+ * worker (real-LLM runtime verification is deferred → W-1-4-1).
  * The "cache / last-good" degradation tier is not implemented (no
  * prior-good store exists yet) → deferred W-1-4-2 (non-silent).
  */
 import { randomUUID } from "node:crypto";
-
-import Anthropic from "@anthropic-ai/sdk";
 
 import { db } from "@/lib/db/client";
 import { llmCosts } from "@/db/schema";
@@ -40,9 +50,9 @@ import {
   isRetryableStatus,
 } from "@/lib/llm/retry";
 
-// A ≤5-page receipt's JSON can exceed 8K output tokens; 16K stays under
-// the non-streaming SDK HTTP-timeout guidance while avoiding the silent
-// max_tokens-truncation → degrade path on multi-page receipts.
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+
+// A ≤5-page receipt's JSON can exceed 8K output tokens; 16K stays safe.
 const MAX_TOKENS = 16_000;
 
 const SYSTEM_INSTRUCTION =
@@ -73,39 +83,57 @@ export type ParseOutcome =
   | { kind: "parsed"; receipt: ParsedReceipt; degraded: boolean }
   | { kind: "failed"; message: string };
 
-/** Friendly, never-raw failure copy (NFR-R1). */
 const FRIENDLY_FAIL =
   "收據解析暫時失敗，請重拍一張清楚的收據再試一次。";
 
-/** Record one Claude attempt to llm_costs (NFR-L2/L3). Best-effort:
- *  a telemetry write must never mask the parse outcome. */
+/**
+ * OpenRouter's OpenAI-compat response shape (subset we read). They
+ * extend `usage` with an optional `cost` field (final USD with
+ * markup) — we prefer it when present, fall back to cost.ts otherwise.
+ */
+interface OpenRouterResponse {
+  choices?: Array<{
+    message?: { content?: string | null };
+    finish_reason?: string;
+  }>;
+  usage?: {
+    prompt_tokens?: number | null;
+    completion_tokens?: number | null;
+    /** OpenRouter-specific: final USD cost incl. markup. */
+    cost?: number | null;
+  };
+}
+
+/** Record one attempt to llm_costs (NFR-L2/L3). Best-effort —
+ *  telemetry must never mask the parse outcome. */
 async function recordCost(
   ctx: ParseContext,
   model: string,
-  usage: {
-    input_tokens?: number | null;
-    output_tokens?: number | null;
-    cache_creation_input_tokens?: number | null;
-    cache_read_input_tokens?: number | null;
-  } | null,
+  usage: OpenRouterResponse["usage"] | null,
   latencyMs: number,
   success: boolean,
 ): Promise<void> {
   try {
     const u = usage ?? {};
+    const liveCost =
+      typeof u.cost === "number" && Number.isFinite(u.cost) && u.cost >= 0
+        ? u.cost
+        : null;
+    const costUsd =
+      liveCost !== null
+        ? liveCost
+        : computeCostUsd(model, {
+            inputTokens: u.prompt_tokens ?? 0,
+            outputTokens: u.completion_tokens ?? 0,
+          });
     await db.insert(llmCosts).values({
       sessionId: ctx.sessionId,
       requestId: randomUUID(),
       model,
-      promptTokens: u.input_tokens ?? 0,
-      completionTokens: u.output_tokens ?? 0,
+      promptTokens: u.prompt_tokens ?? 0,
+      completionTokens: u.completion_tokens ?? 0,
       latencyMs,
-      costUsd: computeCostUsd(model, {
-        inputTokens: u.input_tokens ?? 0,
-        outputTokens: u.output_tokens ?? 0,
-        cacheCreationInputTokens: u.cache_creation_input_tokens ?? undefined,
-        cacheReadInputTokens: u.cache_read_input_tokens ?? undefined,
-      }).toFixed(6),
+      costUsd: costUsd.toFixed(6),
       success,
     });
   } catch (e) {
@@ -113,12 +141,8 @@ async function recordCost(
   }
 }
 
-function statusOf(err: unknown): number | undefined {
-  return err instanceof Anthropic.APIError ? err.status : undefined;
-}
-
 /**
- * Parse a (multi-page) receipt via the single Claude vision boundary.
+ * Parse a (multi-page) receipt via the single vision LLM boundary.
  * Returns a friendly outcome — never throws raw, never leaks the model
  * error.
  */
@@ -127,10 +151,6 @@ export async function parseReceiptImages(
   mimeTypes: string[],
   ctx: ParseContext,
 ): Promise<ParseOutcome> {
-  // Re-validate the boundary input (the 1.3 producer bounds pageCount,
-  // but this is THE single Claude boundary): no images / array length
-  // mismatch / over the page cap / any empty image → fail friendly
-  // WITHOUT burning paid Claude calls.
   if (
     images.length === 0 ||
     images.length !== mimeTypes.length ||
@@ -139,32 +159,32 @@ export async function parseReceiptImages(
   ) {
     return { kind: "failed", message: FRIENDLY_FAIL };
   }
-  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
-    // No (usable) key in this env: degrade gracefully, do NOT crash the
-    // worker. Real-Claude verification is deferred (W-1-4-1).
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim();
+  if (!apiKey) {
     console.warn(
-      "[visionAdapter] ANTHROPIC_API_KEY not set — friendly degrade (W-1-4-1).",
+      "[visionAdapter] OPENROUTER_API_KEY not set — friendly degrade (W-1-4-1).",
     );
     return { kind: "failed", message: FRIENDLY_FAIL };
   }
 
-  let client: Anthropic;
-  try {
-    client = new Anthropic();
-  } catch {
-    // Constructor must never leak a raw error (NFR-R1).
-    return { kind: "failed", message: FRIENDLY_FAIL };
+  // Optional attribution headers — OpenRouter uses these for app
+  // ranking on their model leaderboards; both safely ignored when absent.
+  const attribution: Record<string, string> = {};
+  if (process.env.OPENROUTER_SITE_URL) {
+    attribution["HTTP-Referer"] = process.env.OPENROUTER_SITE_URL;
   }
+  if (process.env.OPENROUTER_SITE_NAME) {
+    attribution["X-Title"] = process.env.OPENROUTER_SITE_NAME;
+  }
+
+  // OpenAI-compatible vision: each image is a content part of
+  // `{type:"image_url", image_url:{ url:"data:<mt>;base64,<b64>" }}`.
   const content = [
-    ...images.map((data, i) => ({
-      type: "image" as const,
-      source: {
-        type: "base64" as const,
-        media_type: mediaType(mimeTypes[i]),
-        data,
-      },
-    })),
     { type: "text" as const, text: USER_INSTRUCTION },
+    ...images.map((data, i) => ({
+      type: "image_url" as const,
+      image_url: { url: `data:${mediaType(mimeTypes[i])};base64,${data}` },
+    })),
   ];
 
   const plan = buildAttemptPlan(DEGRADATION_MODELS);
@@ -172,100 +192,114 @@ export async function parseReceiptImages(
   for (let i = 0; i < plan.length; i++) {
     const { model, attempt } = plan[i];
     const startedAt = Date.now();
+    let status: number | undefined;
     try {
-      const resp = await client.messages.create({
-        model,
-        max_tokens: MAX_TOKENS,
-        system: [
-          {
-            type: "text",
-            text: SYSTEM_INSTRUCTION,
-            cache_control: { type: "ephemeral" },
-          },
-        ],
-        output_config: {
-          format: {
-            type: "json_schema",
-            schema: PARSED_RECEIPT_JSON_SCHEMA,
-          },
+      const resp = await fetch(OPENROUTER_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          ...attribution,
         },
-        messages: [{ role: "user", content }],
+        body: JSON.stringify({
+          model,
+          max_tokens: MAX_TOKENS,
+          messages: [
+            { role: "system", content: SYSTEM_INSTRUCTION },
+            { role: "user", content },
+          ],
+          // OpenAI-compat structured outputs (schema-enforced JSON).
+          // OpenRouter forwards this to Anthropic; sonnet-4.6 and
+          // haiku-4.5 honour the schema. Defense-in-depth: we still
+          // re-validate via ParsedReceiptSchema below (NFR-L2).
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: "parsed_receipt",
+              strict: true,
+              schema: PARSED_RECEIPT_JSON_SCHEMA,
+            },
+          },
+        }),
       });
-
+      status = resp.status;
       const latency = Date.now() - startedAt;
 
-      if (resp.stop_reason !== "end_turn") {
-        // refusal / max_tokens / pause_turn / anything not a clean
-        // completion → structural failure, degrade. Diagnostic logs
-        // the reason only (no raw content / no image bytes).
-        console.warn(
-          `[visionAdapter] non-end_turn stop_reason=${resp.stop_reason} model=${model}`,
-        );
-        await recordCost(ctx, model, resp.usage, latency, false);
+      if (!resp.ok) {
+        // Read+discard body to free the connection; we log only the
+        // status (NFR-S3 — never raw content).
+        await resp.text().catch(() => "");
+        await recordCost(ctx, model, null, latency, false);
+        if (status === 401 || status === 403) {
+          console.error(
+            `[visionAdapter] fatal auth status=${status} — aborting chain`,
+          );
+          return { kind: "failed", message: FRIENDLY_FAIL };
+        }
+        if (isRetryableStatus(status)) {
+          if (i < plan.length - 1) {
+            await new Promise((r) =>
+              setTimeout(r, backoffWithJitterMs(attempt)),
+            );
+          }
+          continue;
+        }
+        // Non-retryable on this model → skip remaining retries on
+        // SAME model, jump straight to the next model in the chain.
+        const next = plan.findIndex((s, j) => j > i && s.model !== model);
+        if (next === -1) break;
+        i = next - 1;
         continue;
       }
 
-      const textBlock = resp.content.find((b) => b.type === "text");
-      const raw =
-        textBlock && textBlock.type === "text" ? textBlock.text : "";
+      const body = (await resp.json()) as OpenRouterResponse;
+      const choice = body.choices?.[0];
+      const finish = choice?.finish_reason;
+      // OpenAI calls clean completions "stop"; some OpenRouter
+      // upstream passthroughs report Anthropic's "end_turn" verbatim.
+      // Either is a clean finish.
+      if (finish !== "stop" && finish !== "end_turn") {
+        console.warn(
+          `[visionAdapter] non-stop finish_reason=${finish} model=${model}`,
+        );
+        await recordCost(ctx, model, body.usage ?? null, latency, false);
+        continue;
+      }
+
+      const raw = choice?.message?.content ?? "";
       let parsed: ParsedReceipt;
       try {
         parsed = ParsedReceiptSchema.parse(JSON.parse(raw)); // NFR-L2
       } catch {
-        // Distinguish "no text" vs "invalid JSON/shape" for ops — never
-        // log the content itself (NFR-S3).
         console.warn(
           `[visionAdapter] response not schema-valid model=${model} textLen=${raw.length}`,
         );
-        await recordCost(ctx, model, resp.usage, latency, false);
-        continue; // invalid structure → degrade
+        await recordCost(ctx, model, body.usage ?? null, latency, false);
+        continue;
       }
 
-      await recordCost(ctx, model, resp.usage, latency, true);
-      // Degraded ONLY if we fell back OFF the primary model. A
-      // transient retry that still succeeded on the primary model is a
-      // clean success, not a degradation (architecture L266-270 =
-      // model fallback).
+      await recordCost(ctx, model, body.usage ?? null, latency, true);
       const degraded = model !== DEGRADATION_MODELS[0];
       return { kind: "parsed", receipt: parsed, degraded };
     } catch (err) {
+      // Network-level error (DNS / ECONNRESET / fetch timeout) — no
+      // HTTP status; treat as retryable.
       const latency = Date.now() - startedAt;
       await recordCost(ctx, model, null, latency, false);
-      const status = statusOf(err);
-
-      // Auth/permission is fatal for EVERY model (same API key) —
-      // abort the whole chain immediately; degrading is pointless.
-      if (status === 401 || status === 403) {
-        console.error(
-          `[visionAdapter] fatal auth status=${status} — aborting chain`,
+      console.warn(
+        "[visionAdapter] network error:",
+        err instanceof Error ? err.message : String(err),
+      );
+      if (i < plan.length - 1) {
+        await new Promise((r) =>
+          setTimeout(r, backoffWithJitterMs(attempt)),
         );
-        return { kind: "failed", message: FRIENDLY_FAIL };
       }
-
-      // Retryable = explicit transient status OR a network-level error
-      // (no HTTP status: ECONNRESET / DNS / timeout — a retry likely
-      // helps).
-      const retryable = status === undefined || isRetryableStatus(status);
-      if (retryable) {
-        if (i < plan.length - 1) {
-          await new Promise((r) =>
-            setTimeout(r, backoffWithJitterMs(attempt)),
-          );
-        }
-        continue; // next attempt (same model until its retries used up)
-      }
-
-      // Non-retryable (e.g. 400) won't change on a retry of the SAME
-      // model — skip straight to the next model (don't burn its
-      // remaining attempts on identical failures).
-      const next = plan.findIndex((s, j) => j > i && s.model !== model);
-      if (next === -1) break; // no other model left → friendly fail
-      i = next - 1; // the loop's i++ lands exactly on `next`
       continue;
     }
   }
 
-  // Plan exhausted (retries + model degradation). The cache/last-good
-  // tier is intentionally not implemented (W-1-4-2). Friendly only.
+  // Plan exhausted. Cache/last-good tier intentionally not implemented
+  // (W-1-4-2). Friendly only.
   return { kind: "failed", message: FRIENDLY_FAIL };
 }

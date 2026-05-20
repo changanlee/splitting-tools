@@ -206,24 +206,27 @@
   — job stays `queued`/in pg-boss until Story 1.4; that is expected.)
 - **Tracked in:** `1-3-async-parse-job-polling.md` Completion Notes.
 
-## W-1-4-1 — Story 1.4 real Claude vision runtime verification
+## W-1-4-1 — Story 1.4 real vision-LLM runtime verification
 
-- **Status:** OPEN
+- **Status:** OPEN (provider migrated 2026-05-20: Anthropic SDK → OpenRouter)
 - **Priority:** P1
 - **Story:** 1-4-vision-llm-parse (AC2/AC3/AC5/AC9)
-- **Gap:** no `ANTHROPIC_API_KEY` in the autonomous env, so the actual
-  Claude multi-image call, structured-output parsing, prompt-cache
-  hit, token-usage→cost, retry/degradation on real 429/5xx, and
-  #5564 parse accuracy are NOT runtime-verified. Pure logic
-  (schema/cost/retry) IS node-tested; visionAdapter is type-checked +
-  static-scanned (single boundary, no leak).
+- **Gap:** no `OPENROUTER_API_KEY` in the autonomous env, so the actual
+  multi-image call (`anthropic/claude-sonnet-4.6` primary → `anthropic/
+  claude-haiku-4.5` fallback via OpenRouter), structured-output JSON
+  schema enforcement, token-usage→cost (preferring OpenRouter's
+  `usage.cost` field over the offline cost.ts table), retry/degradation
+  on real 429/5xx, and #5564 parse accuracy are NOT runtime-verified.
+  Pure logic (schema/cost/retry) IS node-tested; visionAdapter is
+  type-checked + static-scanned (single boundary, no leak).
 - **Reason for defer:** needs a real API key + a real receipt; can't
   be done unattended without fabricating (would violate "no lying").
-- **Trigger / resolve when:** with `ANTHROPIC_API_KEY` set, run the
+- **Trigger / resolve when:** with `OPENROUTER_API_KEY` set, run the
   worker against a real #5564 image; confirm structured lines parse,
-  `llm_costs` row written with non-zero cost, degradation path on an
-  induced failure, friendly-only `parse_jobs.error`. Record in
-  `1-4-...md` Debug Log; then fill the regression `it.todo`.
+  `llm_costs` row written with non-zero cost (live `usage.cost` if
+  returned), degradation path on an induced failure, friendly-only
+  `parse_jobs.error`. Record in `1-4-...md` Debug Log; then fill the
+  regression `it.todo`.
 - **Tracked in:** `1-4-vision-llm-parse.md`; relates to W-CR-5.
 
 ## W-1-4-2 — Degradation cache / last-good tier

@@ -26,7 +26,10 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgres://postgres:postgres@db:5432/splitting}
       SENTRY_DSN: ${SENTRY_DSN:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_SITE_URL: ${OPENROUTER_SITE_URL:-}
+      OPENROUTER_SITE_NAME: ${OPENROUTER_SITE_NAME:-}
+      IP_HASH_SECRET: ${IP_HASH_SECRET:-}
     ports:
       - "${WEB_PORT:-3000}:3000"
     depends_on:
@@ -39,7 +42,10 @@ services:
       dockerfile: Dockerfile.worker
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgres://postgres:postgres@db:5432/splitting}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_SITE_URL: ${OPENROUTER_SITE_URL:-}
+      OPENROUTER_SITE_NAME: ${OPENROUTER_SITE_NAME:-}
+      IP_HASH_SECRET: ${IP_HASH_SECRET:-}
     depends_on:
       db:
         condition: service_healthy

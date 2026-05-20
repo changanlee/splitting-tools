@@ -45,12 +45,12 @@ describe("buildAttemptPlan (NFR-R1 degradation order)", () => {
     const plan = buildAttemptPlan(DEGRADATION_MODELS, 3);
     expect(plan).toHaveLength(6);
     expect(plan.map((s) => `${s.model}#${s.attempt}`)).toEqual([
-      "claude-sonnet-4-6#1",
-      "claude-sonnet-4-6#2",
-      "claude-sonnet-4-6#3",
-      "claude-haiku-4-5-20251001#1",
-      "claude-haiku-4-5-20251001#2",
-      "claude-haiku-4-5-20251001#3",
+      "anthropic/claude-sonnet-4.6#1",
+      "anthropic/claude-sonnet-4.6#2",
+      "anthropic/claude-sonnet-4.6#3",
+      "anthropic/claude-haiku-4.5#1",
+      "anthropic/claude-haiku-4.5#2",
+      "anthropic/claude-haiku-4.5#3",
     ]);
   });
   it("respects a custom retriesPerModel", () => {
