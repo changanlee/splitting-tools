@@ -70,6 +70,15 @@ export function ReceiptLineRow({ line, suspicious, editHref }: Props) {
         <span className="tabular-nums">
           {formatCents(line.grossCents, { signed: true })}
         </span>
+        {editHref ? (
+          <a
+            href={editHref}
+            className="shrink-0 text-xs text-primary underline underline-offset-2 hover:no-underline"
+            aria-label={`IRC 改綁第 ${line.lineNo} 行`}
+          >
+            {line.orphan ? "改綁" : "編輯"}
+          </a>
+        ) : null}
       </li>
     );
   }

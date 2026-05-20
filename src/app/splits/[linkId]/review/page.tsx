@@ -14,6 +14,7 @@ import { notFound } from "next/navigation";
 
 import { computeReconciliation } from "@/features/reconciliation/compute";
 import { AddLineForm } from "@/features/reconciliation/components/AddLineForm";
+import { IrcRebindForm } from "@/features/reconciliation/components/IrcRebindForm";
 import { OrphanIrcBanner } from "@/features/reconciliation/components/OrphanIrcBanner";
 import { ReceiptLineEditForm } from "@/features/reconciliation/components/ReceiptLineEditForm";
 import { ReceiptLineRow } from "@/features/reconciliation/components/ReceiptLineRow";
@@ -111,25 +112,42 @@ export default async function ReviewPage({ params, searchParams }: Ctx) {
         核對逐行品項
       </h1>
       <ol className="flex-1" aria-label="收據逐行品項">
-        {summary.lines.map((l) =>
-          // Story 2.3 — editing variant: ?edit=<lineId> swaps that row
-          // for the inline edit/delete form. Only non-IRC product
-          // rows are editable here (IRC re-binding is Story 2.4).
-          editingLineId === l.id && !l.isIrc ? (
-            <ReceiptLineEditForm key={l.id} linkId={linkId} line={l} />
-          ) : (
+        {summary.lines.map((l) => {
+          // Story 2.4 — IRC row in edit mode → IrcRebindForm
+          if (editingLineId === l.id && l.isIrc) {
+            const candidates = summary.lines.filter((c) => !c.isIrc);
+            return (
+              <IrcRebindForm
+                key={l.id}
+                linkId={linkId}
+                ircLine={l}
+                candidates={candidates}
+              />
+            );
+          }
+          // Story 2.3 — non-IRC row in edit mode → ReceiptLineEditForm
+          if (editingLineId === l.id && !l.isIrc) {
+            return (
+              <ReceiptLineEditForm key={l.id} linkId={linkId} line={l} />
+            );
+          }
+          // Default — read-only row with optional edit anchor.
+          // Both IRC and non-IRC rows can enter edit mode now (2.3
+          // owns line-edit, 2.4 owns IRC re-bind; the row component
+          // doesn't care which form the page picks).
+          return (
             <ReceiptLineRow
               key={l.id}
               line={l}
               suspicious={suspiciousByLine.get(l.id)}
               editHref={
-                !l.isIrc && !editingLineId
+                !editingLineId
                   ? `/splits/${linkId}/review?edit=${l.id}`
                   : undefined
               }
             />
-          ),
-        )}
+          );
+        })}
       </ol>
       {/* Story 2.3 — append a new product line. */}
       <AddLineForm linkId={linkId} />

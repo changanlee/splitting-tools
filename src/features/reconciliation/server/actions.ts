@@ -189,3 +189,87 @@ export async function addLineAction(
 // "unused" lint by keeping a typed reference. (drizzle re-exports
 // `asc`/`desc` from the same module; we use `desc` above.)
 export const _internalAsc = asc;
+
+import { recomputeNets } from "@/features/reconciliation/recompute";
+
+/**
+ * Story 2.4 — re-bind an IRC line to a new parent (or to orphan)
+ * and re-fold ALL parents' `net_cents` over the whole session in a
+ * single transaction. The pure maths is in `recompute.ts`.
+ *
+ * `newParentId` may be:
+ *   - a non-IRC line id in the same session → attribute, orphan=false
+ *   - "" or "orphan" → orphan
+ *
+ * Any other string is rejected as invalid input (FRIENDLY_INVALID).
+ */
+export async function rebindIrcAction(
+  linkId: string,
+  ircLineId: string,
+  formData: FormData,
+): Promise<void> {
+  const rawParent = String(formData.get("parentId") ?? "").trim();
+  const newParentId: string | null =
+    rawParent === "" || rawParent === "orphan" ? null : rawParent;
+
+  try {
+    await assertSession(linkId);
+
+    // Read the full line set ONCE so the recompute sees the post-
+    // rebind state. We mutate `irc_attributed_to` in memory then ask
+    // recomputeNets to derive every net + orphan flag.
+    const rows = await db
+      .select({
+        id: receiptLines.id,
+        grossCents: receiptLines.grossCents,
+        isIrc: receiptLines.isIrc,
+        ircAttributedTo: receiptLines.ircAttributedTo,
+      })
+      .from(receiptLines)
+      .where(eq(receiptLines.sessionId, linkId));
+
+    const ircRow = rows.find((r) => r.id === ircLineId && r.isIrc);
+    if (!ircRow) throw new Error(FRIENDLY_NOT_FOUND);
+
+    // Validate newParentId points at an existing non-IRC line.
+    if (newParentId !== null) {
+      const parent = rows.find((r) => r.id === newParentId);
+      if (!parent || parent.isIrc) throw new Error(FRIENDLY_INVALID);
+    }
+
+    const post = rows.map((r) =>
+      r.id === ircLineId ? { ...r, ircAttributedTo: newParentId } : r,
+    );
+    const recomputed = recomputeNets(post);
+
+    // Persist: IRC line's irc_attributed_to + every line's net /
+    // orphan. drizzle node-postgres doesn't ship a clean bulk-update,
+    // so loop is fine here (rows are bounded by MAX_PARSE_PAGES).
+    await db.transaction(async (tx) => {
+      await tx
+        .update(receiptLines)
+        .set({ ircAttributedTo: newParentId })
+        .where(eq(receiptLines.id, ircLineId));
+      for (const out of recomputed) {
+        await tx
+          .update(receiptLines)
+          .set({ netCents: out.netCents, orphan: out.orphan })
+          .where(eq(receiptLines.id, out.id));
+      }
+    });
+  } catch (e) {
+    if (
+      e instanceof Error &&
+      (e.message === FRIENDLY_NOT_FOUND || e.message === FRIENDLY_INVALID)
+    ) {
+      throw e;
+    }
+    console.error(
+      "[rebindIrcAction] failed:",
+      e instanceof Error ? e.message : String(e),
+    );
+    throw new Error(FRIENDLY_UNEXPECTED);
+  }
+
+  revalidatePath(`/splits/${linkId}/review`);
+}
