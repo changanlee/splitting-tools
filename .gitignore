@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Claude Code harness — regenerated every session, never project content
+.claude/scheduled_tasks.lock
