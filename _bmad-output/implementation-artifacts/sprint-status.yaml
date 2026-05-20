@@ -76,14 +76,14 @@ development_status:
   epic-1-retrospective: optional
 
   # ---- Epic 2: 核對閘門 (FR8-16) ----
-  epic-2: in-progress  # started 2026-05-20
+  epic-2: done  # 2026-05-20 — all 7 stories complete
   2-1-reconciliation-display: done  # dev+review 2026-05-20; 4 patches; gate green 122pass2todo
   2-2-suspicious-line-locate: done  # autonomous 2026-05-20; gate green 133pass2todo
   2-3-line-edit-add-delete: done  # autonomous 2026-05-20; gate green 142pass2todo
   2-4-irc-rebind-parent: done  # autonomous 2026-05-20; gate green 147pass2todo
   2-5-manual-printed-total: done  # autonomous 2026-05-20
   2-6-unverified-force-pass: done  # autonomous 2026-05-20
-  2-7-never-deadlock-guarantee: backlog
+  2-7-never-deadlock-guarantee: done  # autonomous 2026-05-20 — Epic 2 closed
   epic-2-retrospective: optional
 
   # ---- Epic 3: 出連結 (FR17-19) ----

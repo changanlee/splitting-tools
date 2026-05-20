@@ -16,6 +16,7 @@ import { computeReconciliation } from "@/features/reconciliation/compute";
 import { AddLineForm } from "@/features/reconciliation/components/AddLineForm";
 import { ForcePassForm } from "@/features/reconciliation/components/ForcePassForm";
 import { IrcRebindForm } from "@/features/reconciliation/components/IrcRebindForm";
+import { NextStepGate } from "@/features/reconciliation/components/NextStepGate";
 import { OrphanIrcBanner } from "@/features/reconciliation/components/OrphanIrcBanner";
 import { PrintedTotalForm } from "@/features/reconciliation/components/PrintedTotalForm";
 import { ReceiptLineEditForm } from "@/features/reconciliation/components/ReceiptLineEditForm";
@@ -167,9 +168,12 @@ export default async function ReviewPage({ params, searchParams }: Ctx) {
         linkId={linkId}
         currentlyUnverified={summary.unverified}
       />
+      {/* Story 2.7 — always-forward gate; canProgress ensures no
+          state is a dead end (FR16 / NFR-R2). */}
+      <NextStepGate linkId={linkId} state={reconciliation.state} />
       <footer className="px-4 py-4 text-xs text-muted-foreground border-t">
-        Stories 2.1–2.6 完成。前進保證（2-7）／連結（Epic 3）／認領（Epic 4）／
-        結算（Epic 5）／生命週期（Epic 6）由後續 story 接續。
+        Epic 2 完成（核對閘門 FR8–16）。連結（Epic 3）／認領（Epic 4）／
+        結算（Epic 5）／生命週期（Epic 6）由後續 epic 接續。
       </footer>
     </main>
   );
