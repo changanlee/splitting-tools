@@ -116,7 +116,7 @@ development_status:
   epic-5-retrospective: optional
 
   # ---- Epic 6: 資料生命週期與隱私 (FR44-45) ----
-  epic-6: backlog
-  6-1-30day-verifiable-destroy: backlog
+  epic-6: done  # 2026-05-20 — all 2 stories complete
+  6-1-30day-verifiable-destroy: done  # autonomous 2026-05-20 — daily cron + verified residual=0
   6-2-noindex-anti-discovery: done  # autonomous 2026-05-20 — metadata.robots + robots.ts + middleware X-Robots-Tag triple
   epic-6-retrospective: optional

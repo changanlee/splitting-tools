@@ -12,6 +12,7 @@ import { and, eq, notInArray } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { parseJobs, sessions } from "@/db/schema";
 import { generateLinkId } from "@/lib/linkId";
+import { expiresAt } from "@/features/lifecycle/expiry";
 
 /** Terminal statuses are FINAL — never overwritten (a pg-boss
  *  redelivery / double-process must not resurrect a finished job). */
@@ -27,7 +28,13 @@ export async function createSession(): Promise<string> {
   // NFR-S1). Architecture L256-258 explicitly rejects UUIDv4. The
   // returned id IS the link.
   const id = generateLinkId();
-  await db.insert(sessions).values({ id }).onConflictDoNothing();
+  // Story 6.1 — stamp expires_at = now + 30d (NFR-S4). The
+  // lifecycleWorker deletes sessions where expires_at < NOW().
+  const now = new Date();
+  await db
+    .insert(sessions)
+    .values({ id, expiresAt: expiresAt(now) })
+    .onConflictDoNothing();
   return id;
 }
 

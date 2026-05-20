@@ -26,6 +26,7 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { PgBoss } from "pg-boss";
 import { Pool } from "pg";
 
+import { registerLifecycleWorker } from "@/workers/lifecycleWorker";
 import { registerParseWorker } from "@/workers/parseWorker";
 
 const MIGRATIONS_FOLDER = "drizzle/migrations";
@@ -99,6 +100,8 @@ async function main(): Promise<void> {
   // Story 1.4: register THE parse consumer (boss.work). All Claude
   // calls go through src/lib/llm/visionAdapter — never bypassed.
   await registerParseWorker(boss);
+  // Story 6.1 — schedule the 30-day verifiable destruction job.
+  await registerLifecycleWorker(boss);
   console.log("[worker] parseWorker registered (consumer ready)");
 
   let stopping = false;
