@@ -25,6 +25,11 @@ import {
   appendChange,
   latestChangeForIdentity,
 } from "@/features/claiming/server/changeLog";
+import {
+  FRIENDLY_FROZEN,
+  isFrozen,
+} from "@/features/settlement/freeze";
+import { sessions } from "@/db/schema";
 import { isValidLinkId } from "@/lib/linkId";
 
 const FRIENDLY_INVALID = "輸入內容格式不正確，請確認後再試。";
@@ -37,6 +42,15 @@ async function resolveIdentity(linkId: string, rawToken: string) {
   if (!isValidDeviceToken(rawToken)) throw new Error(FRIENDLY_INVALID);
   const sessionOk = await sessionExistsRepo(linkId);
   if (!sessionOk) throw new Error(FRIENDLY_NOT_FOUND);
+  // Story 5.5 — refuse any claim write once the session is frozen.
+  const statusRows = await db
+    .select({ status: sessions.status })
+    .from(sessions)
+    .where(eq(sessions.id, linkId))
+    .limit(1);
+  if (statusRows[0] && isFrozen(statusRows[0].status)) {
+    throw new Error(FRIENDLY_FROZEN);
+  }
   const identity = await findIdentityForToken(linkId, rawToken);
   if (!identity) throw new Error(FRIENDLY_AUTH);
   return identity;
@@ -67,7 +81,7 @@ export async function toggleClaimAction(
   } catch (e) {
     if (
       e instanceof Error &&
-      [FRIENDLY_INVALID, FRIENDLY_AUTH, FRIENDLY_NOT_FOUND].includes(e.message)
+      [FRIENDLY_INVALID, FRIENDLY_AUTH, FRIENDLY_NOT_FOUND, FRIENDLY_FROZEN].includes(e.message)
     ) {
       throw e;
     }
@@ -112,7 +126,7 @@ export async function setClaimWeightAction(
   } catch (e) {
     if (
       e instanceof Error &&
-      [FRIENDLY_INVALID, FRIENDLY_AUTH, FRIENDLY_NOT_FOUND].includes(e.message)
+      [FRIENDLY_INVALID, FRIENDLY_AUTH, FRIENDLY_NOT_FOUND, FRIENDLY_FROZEN].includes(e.message)
     ) {
       throw e;
     }

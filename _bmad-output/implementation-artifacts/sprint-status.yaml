@@ -107,12 +107,12 @@ development_status:
   epic-4-retrospective: optional
 
   # ---- Epic 5: 結算與結束 (FR35-42, FR50) ----
-  epic-5: in-progress  # started 2026-05-20 — 5.1 done; 5.2-5.5 deferred
+  epic-5: done  # 2026-05-20 — all 5 stories complete
   5-1-settlement-deterministic-fn: done  # autonomous 2026-05-20 — FR50 invariant gates green
-  5-2-settlement-page-trust-thumbnail: backlog
-  5-3-plaintext-export: backlog
-  5-4-payer-absorb-finalize: backlog
-  5-5-freeze-readonly-late-joiner: backlog
+  5-2-settlement-page-trust-thumbnail: done  # autonomous 2026-05-20
+  5-3-plaintext-export: done  # autonomous 2026-05-20
+  5-4-payer-absorb-finalize: done  # autonomous 2026-05-20
+  5-5-freeze-readonly-late-joiner: done  # autonomous 2026-05-20 — claim actions reject when frozen
   epic-5-retrospective: optional
 
   # ---- Epic 6: 資料生命週期與隱私 (FR44-45) ----
