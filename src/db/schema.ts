@@ -161,3 +161,85 @@ export const receiptLines = pgTable(
     index("idx_receipt_lines_session").on(t.sessionId),
   ],
 );
+
+/**
+ * Identities — Story 4.1/4.2. One person (claimant) per session,
+ * bound to a device token (`device_token_hash` = sha256 of the
+ * raw token; raw never persisted — NFR-S3 privacy).
+ *
+ * Linked to sessions only; no global user table.
+ */
+export const identities = pgTable(
+  "identities",
+  {
+    id: text("id").primaryKey(),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => sessions.id),
+    name: text("name").notNull(),
+    deviceTokenHash: text("device_token_hash").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("idx_identities_session").on(t.sessionId),
+    index("idx_identities_session_token").on(t.sessionId, t.deviceTokenHash),
+  ],
+);
+
+/**
+ * Claims — Story 4.4/4.5. One identity claims one receipt line;
+ * `weight` defaults to 1 (4.5 weighted shares).
+ *
+ * UNIQUE (receipt_line_id, identity_id) — one identity can claim a
+ * line at most once (toggle on/off; weight changes via separate
+ * action). The (line, identity) → single claim row.
+ */
+export const claims = pgTable(
+  "claims",
+  {
+    id: text("id").primaryKey(),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => sessions.id),
+    receiptLineId: text("receipt_line_id")
+      .notNull()
+      .references(() => receiptLines.id),
+    identityId: text("identity_id")
+      .notNull()
+      .references(() => identities.id),
+    weight: integer("weight").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("uq_claims_line_identity").on(t.receiptLineId, t.identityId),
+    index("idx_claims_session").on(t.sessionId),
+    index("idx_claims_identity").on(t.identityId),
+  ],
+);
+
+/**
+ * Claim change log — Story 4.9 / FR-audit. Append-only history of
+ * mutations the payer can review (claim/unclaim/edit/add/delete/
+ * force-pass etc.). bigserial pk; jsonb details for shape flexibility.
+ */
+export const claimChanges = pgTable(
+  "claim_changes",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => sessions.id),
+    receiptLineId: text("receipt_line_id"),
+    identityId: text("identity_id"),
+    action: text("action").notNull(),
+    details: text("details"), // JSON-as-text — keeps dependency surface tight
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("idx_claim_changes_session_created_at").on(t.sessionId, t.createdAt)],
+);

@@ -94,16 +94,16 @@ development_status:
   epic-3-retrospective: optional
 
   # ---- Epic 4: 朋友自助認領 (FR20-34, FR47-49) ----
-  epic-4: backlog
-  4-1-noauth-entry-device-token: backlog
-  4-2-identity-picker-name-memory: backlog
-  4-3-fix-identity-token-isolation: backlog
-  4-4-claim-toggle-subtotal: backlog
-  4-5-weighted-multi-claim: backlog
-  4-6-claim-done-undo: backlog
-  4-7-pending-race-authority: backlog
-  4-8-claim-board-polling: backlog
-  4-9-payer-change-log: backlog
+  epic-4: in-progress  # started 2026-05-20
+  4-1-noauth-entry-device-token: done  # autonomous 2026-05-20
+  4-2-identity-picker-name-memory: done  # autonomous 2026-05-20
+  4-3-fix-identity-token-isolation: in-progress  # core last-write-wins shipped; hardening deferred W-4-3-1
+  4-4-claim-toggle-subtotal: done  # autonomous 2026-05-20
+  4-5-weighted-multi-claim: done  # autonomous 2026-05-20 — weighted shareMath + per-row weight input
+  4-6-claim-done-undo: in-progress  # autonomous 2026-05-20
+  4-7-pending-race-authority: in-progress  # autonomous 2026-05-20
+  4-8-claim-board-polling: in-progress  # autonomous 2026-05-20
+  4-9-payer-change-log: in-progress  # autonomous 2026-05-20
   epic-4-retrospective: optional
 
   # ---- Epic 5: 結算與結束 (FR35-42, FR50) ----
