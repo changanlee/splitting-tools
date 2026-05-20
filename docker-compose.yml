@@ -35,6 +35,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # Survive transient DB blips (mac sleep / db recovery mode). The
+    # worker's pg-boss error handler exits non-zero on purpose — let
+    # the orchestrator bring it back.
+    restart: unless-stopped
 
   worker:
     build:
@@ -49,6 +53,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # Survive transient DB blips (mac sleep / db recovery mode). The
+    # worker's pg-boss error handler exits non-zero on purpose — let
+    # the orchestrator bring it back.
+    restart: unless-stopped
 
 volumes:
   db_data:
