@@ -56,7 +56,7 @@
 #   each story states its own Drizzle schema DDL.
 
 generated: 2026-05-19
-last_updated: 2026-05-20T05:38
+last_updated: 2026-05-20T06:05
 project: splitting_tools
 project_key: NOKEY
 tracking_system: file-system
@@ -76,8 +76,8 @@ development_status:
   epic-1-retrospective: optional
 
   # ---- Epic 2: 核對閘門 (FR8-16) ----
-  epic-2: backlog
-  2-1-reconciliation-display: backlog
+  epic-2: in-progress  # started 2026-05-20
+  2-1-reconciliation-display: ready-for-dev  # create-story 2026-05-20
   2-2-suspicious-line-locate: backlog
   2-3-line-edit-add-delete: backlog
   2-4-irc-rebind-parent: backlog
