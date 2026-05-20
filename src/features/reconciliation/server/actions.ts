@@ -203,6 +203,48 @@ import { recomputeNets } from "@/features/reconciliation/recompute";
  *
  * Any other string is rejected as invalid input (FRIENDLY_INVALID).
  */
+/**
+ * Story 2.5 — set / clear `sessions.printed_total_cents` (FR13).
+ * Empty input clears (reverts to awaiting_printed_total state);
+ * otherwise must parse as positive integer cents. revalidatePath so
+ * SubtotalBar swaps state on the next render.
+ */
+export async function setPrintedTotalAction(
+  linkId: string,
+  formData: FormData,
+): Promise<void> {
+  const raw = String(formData.get("printedTotal") ?? "").trim();
+  let printedTotalCents: number | null;
+  if (raw === "") {
+    printedTotalCents = null;
+  } else {
+    printedTotalCents = parseCentsInput(raw);
+    if (printedTotalCents === null) throw new Error(FRIENDLY_INVALID);
+  }
+
+  try {
+    await assertSession(linkId);
+    await db
+      .update(sessions)
+      .set({ printedTotalCents, updatedAt: new Date() })
+      .where(eq(sessions.id, linkId));
+  } catch (e) {
+    if (
+      e instanceof Error &&
+      (e.message === FRIENDLY_NOT_FOUND || e.message === FRIENDLY_INVALID)
+    ) {
+      throw e;
+    }
+    console.error(
+      "[setPrintedTotalAction] failed:",
+      e instanceof Error ? e.message : String(e),
+    );
+    throw new Error(FRIENDLY_UNEXPECTED);
+  }
+
+  revalidatePath(`/splits/${linkId}/review`);
+}
+
 export async function rebindIrcAction(
   linkId: string,
   ircLineId: string,

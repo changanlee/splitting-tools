@@ -16,6 +16,7 @@ import { computeReconciliation } from "@/features/reconciliation/compute";
 import { AddLineForm } from "@/features/reconciliation/components/AddLineForm";
 import { IrcRebindForm } from "@/features/reconciliation/components/IrcRebindForm";
 import { OrphanIrcBanner } from "@/features/reconciliation/components/OrphanIrcBanner";
+import { PrintedTotalForm } from "@/features/reconciliation/components/PrintedTotalForm";
 import { ReceiptLineEditForm } from "@/features/reconciliation/components/ReceiptLineEditForm";
 import { ReceiptLineRow } from "@/features/reconciliation/components/ReceiptLineRow";
 import { StickySubtotalBar } from "@/features/reconciliation/components/StickySubtotalBar";
@@ -149,6 +150,11 @@ export default async function ReviewPage({ params, searchParams }: Ctx) {
           );
         })}
       </ol>
+      {/* Story 2.5 — manual printed-total input (FR13 escape hatch). */}
+      <PrintedTotalForm
+        linkId={linkId}
+        currentCents={summary.printedTotalCents}
+      />
       {/* Story 2.3 — append a new product line. */}
       <AddLineForm linkId={linkId} />
       <footer className="px-4 py-4 text-xs text-muted-foreground border-t">
