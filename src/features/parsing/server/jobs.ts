@@ -11,6 +11,7 @@ import { and, eq, notInArray } from "drizzle-orm";
 
 import { db } from "@/lib/db/client";
 import { parseJobs, sessions } from "@/db/schema";
+import { generateLinkId } from "@/lib/linkId";
 
 /** Terminal statuses are FINAL — never overwritten (a pg-boss
  *  redelivery / double-process must not resurrect a finished job). */
@@ -22,7 +23,10 @@ const TERMINAL: string[] = ["succeeded", "failed", "degraded"];
  * a non-guessable placeholder 3.1 will formalize (not pre-empted here).
  */
 export async function createSession(): Promise<string> {
-  const id = randomUUID();
+  // Story 3.1 — 16-byte crypto-random → base64url (≥128-bit entropy;
+  // NFR-S1). Architecture L256-258 explicitly rejects UUIDv4. The
+  // returned id IS the link.
+  const id = generateLinkId();
   await db.insert(sessions).values({ id }).onConflictDoNothing();
   return id;
 }

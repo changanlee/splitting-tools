@@ -21,6 +21,7 @@ import {
   sessionExists,
 } from "@/features/parsing/server/jobs";
 import { enqueueParse } from "@/features/parsing/server/queue";
+import { isValidLinkId } from "@/lib/linkId";
 
 /** Per-file byte cap (masked compressed JPEGs are ~hundreds KB; 8MB is
  *  a generous abuse ceiling that still bounds request memory). */
@@ -36,6 +37,13 @@ export async function POST(
   ctx: { params: Promise<{ linkId: string }> },
 ): Promise<Response> {
   const { linkId } = await ctx.params;
+
+  // Story 3.1 — shape-guard the linkId BEFORE any DB / form work.
+  // Closes W-2-1-3 (raw URL segments hitting Drizzle and being
+  // swallowed as generic friendly errors).
+  if (!isValidLinkId(linkId)) {
+    return err("NO_SESSION", "找不到這個分帳，請重新開始。", 404);
+  }
 
   let form: FormData;
   try {

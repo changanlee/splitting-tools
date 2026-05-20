@@ -12,6 +12,8 @@
  */
 import { notFound } from "next/navigation";
 
+import { isValidLinkId } from "@/lib/linkId";
+
 import { computeReconciliation } from "@/features/reconciliation/compute";
 import { AddLineForm } from "@/features/reconciliation/components/AddLineForm";
 import { ForcePassForm } from "@/features/reconciliation/components/ForcePassForm";
@@ -39,6 +41,13 @@ interface Ctx {
 export default async function ReviewPage({ params, searchParams }: Ctx) {
   const { linkId } = await params;
   const { edit: editingLineId } = await searchParams;
+
+  // Story 3.1 — closes W-2-1-3: reject obviously-malformed linkIds
+  // with a clean 404 instead of letting them hit the DB and get
+  // swallowed into a generic friendly-error page.
+  if (!isValidLinkId(linkId)) {
+    notFound();
+  }
 
   let summary: Awaited<ReturnType<typeof getReconciliationSummary>>;
   try {

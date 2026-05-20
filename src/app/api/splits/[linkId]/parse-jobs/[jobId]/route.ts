@@ -12,12 +12,22 @@ import {
   friendlyJobMessage,
 } from "@/features/parsing/schema";
 import { getJobStatus } from "@/features/parsing/server/jobs";
+import { isValidLinkId } from "@/lib/linkId";
 
 export async function GET(
   _request: Request,
   ctx: { params: Promise<{ linkId: string; jobId: string }> },
 ): Promise<Response> {
   const { linkId, jobId } = await ctx.params;
+
+  // Story 3.1 — shape-guard linkId; bad shape → clean 404 instead of
+  // a Drizzle UUID error swallowed as a generic 502.
+  if (!isValidLinkId(linkId)) {
+    const body: ErrorEnvelope = {
+      error: { code: "NOT_FOUND", message: "找不到這筆解析工作。" },
+    };
+    return Response.json(body, { status: 404 });
+  }
 
   let row: { status: string; error: string | null } | null;
   try {
