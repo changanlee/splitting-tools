@@ -32,6 +32,9 @@ export interface ReconciliationSummary {
   printedTotalCents: number | null;
   /** Story 2.6 — payer has chosen the FR14 force-pass escape hatch. */
   unverified: boolean;
+  /** ISO 4217 stamped by the parser; null when the parse hasn't
+   *  successfully run yet or the LLM couldn't detect it. */
+  currency: string | null;
   lines: ReceiptLineView[];
 }
 
@@ -48,6 +51,7 @@ export async function getReconciliationSummary(
       id: sessions.id,
       printedTotalCents: sessions.printedTotalCents,
       unverified: sessions.unverified,
+      currency: sessions.currency,
     })
     .from(sessions)
     .where(eq(sessions.id, linkId))
@@ -88,6 +92,7 @@ export async function getReconciliationSummary(
     parsedSumCents,
     printedTotalCents: sess.printedTotalCents,
     unverified: sess.unverified,
+    currency: sess.currency,
     lines: lineRows,
   };
 }

@@ -78,12 +78,10 @@ export default async function ClaimPage({ params }: Ctx) {
               weight: c.weight,
             }))}
             unverified={summary?.unverified ?? false}
+            currency={summary?.currency ?? null}
           />
         )}
       </MyIdentityResolver>
-      <footer className="px-1 py-3 text-xs text-muted-foreground border-t">
-        Stories 4.1/4.2/4.4/4.5 完成。4.3 token 隔離 / 4.6 撤銷 / 4.7 race / 4.8 看板輪詢 / 4.9 變更紀錄 由後續 story 接續。
-      </footer>
     </main>
   );
 }

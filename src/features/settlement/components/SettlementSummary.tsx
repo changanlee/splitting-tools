@@ -11,6 +11,7 @@ interface Props {
   parsedSumCents: number;
   printedTotalCents: number | null;
   unverified: boolean;
+  currency: string | null;
 }
 
 export function SettlementSummary({
@@ -20,14 +21,16 @@ export function SettlementSummary({
   parsedSumCents,
   printedTotalCents,
   unverified,
+  currency,
 }: Props) {
   const headerTotal = printedTotalCents ?? parsedSumCents;
+  const fmt = (c: number) => formatCents(c, { currency });
   return (
     <article className="rounded-lg border border-border bg-card p-4 flex flex-col gap-3 text-card-foreground">
       <header className="flex items-baseline justify-between">
         <h2 className="text-base font-semibold">結算結果</h2>
         <span className="tabular-nums text-lg font-bold">
-          {formatCents(headerTotal)}
+          {fmt(headerTotal)}
         </span>
       </header>
       {unverified ? (
@@ -48,7 +51,7 @@ export function SettlementSummary({
             >
               <span>{p.name}</span>
               <span className="tabular-nums font-semibold">
-                {formatCents(p.cents)}
+                {fmt(p.cents)}
               </span>
             </li>
           ))}
@@ -57,10 +60,10 @@ export function SettlementSummary({
       {pendingCents > 0 || orphanIrcCents !== 0 ? (
         <footer className="border-t border-border pt-2 flex flex-col gap-1 text-xs text-muted-foreground tabular-nums">
           {pendingCents > 0 ? (
-            <div>待認領 {formatCents(pendingCents)}（付款人吸收）</div>
+            <div>待認領 {fmt(pendingCents)}（付款人吸收）</div>
           ) : null}
           {orphanIrcCents !== 0 ? (
-            <div>孤兒 IRC {formatCents(orphanIrcCents)}</div>
+            <div>孤兒 IRC {fmt(orphanIrcCents)}</div>
           ) : null}
         </footer>
       ) : null}

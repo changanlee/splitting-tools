@@ -18,6 +18,7 @@ interface Props {
   printedTotalCents: number | null;
   unverified: boolean;
   lineCount: number;
+  currency: string | null;
 }
 
 function formatDate(d: Date): string {
@@ -34,6 +35,7 @@ export function MessageCard({
   printedTotalCents,
   unverified,
   lineCount,
+  currency,
 }: Props) {
   const totalToShow = printedTotalCents ?? parsedSumCents;
   return (
@@ -47,7 +49,7 @@ export function MessageCard({
         <dt className="text-muted-foreground">日期</dt>
         <dd className="tabular-nums">{formatDate(createdAt)}</dd>
         <dt className="text-muted-foreground">總額</dt>
-        <dd className="tabular-nums font-medium">{formatCents(totalToShow)}</dd>
+        <dd className="tabular-nums font-medium">{formatCents(totalToShow, { currency })}</dd>
         <dt className="text-muted-foreground">品項</dt>
         <dd>{lineCount} 行</dd>
         <dt className="text-muted-foreground">付款人</dt>
@@ -77,11 +79,12 @@ export function buildShareText(args: {
   printedTotalCents: number | null;
   unverified: boolean;
   lineCount: number;
+  currency: string | null;
 }): string {
   const totalToShow = args.printedTotalCents ?? args.parsedSumCents;
   return [
     `📑 ${formatDate(args.createdAt)} 的分帳`,
-    `總額 ${formatCents(totalToShow)} ／ ${args.lineCount} 行品項`,
+    `總額 ${formatCents(totalToShow, { currency: args.currency })} ／ ${args.lineCount} 行品項`,
     args.unverified ? "⚠ 未經對帳驗證" : null,
     `連結：${args.shareUrl}`,
   ]

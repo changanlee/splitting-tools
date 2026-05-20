@@ -16,6 +16,7 @@ export interface ShareSummary {
   printedTotalCents: number | null;
   unverified: boolean;
   lineCount: number;
+  currency: string | null;
 }
 
 export async function getShareSummary(
@@ -27,6 +28,7 @@ export async function getShareSummary(
       createdAt: sessions.createdAt,
       printedTotalCents: sessions.printedTotalCents,
       unverified: sessions.unverified,
+      currency: sessions.currency,
     })
     .from(sessions)
     .where(eq(sessions.id, linkId))
@@ -48,5 +50,6 @@ export async function getShareSummary(
     printedTotalCents: sess[0].printedTotalCents,
     unverified: sess[0].unverified,
     lineCount: Number(agg[0]?.lineCount ?? 0),
+    currency: sess[0].currency,
   };
 }

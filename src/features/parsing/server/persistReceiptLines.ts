@@ -16,13 +16,17 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 
 import { db } from "@/lib/db/client";
-import { receiptLines } from "@/db/schema";
+import { receiptLines, sessions } from "@/db/schema";
 import type { AttributedReceipt } from "@/features/parsing/irc";
 
 export async function persistReceiptLines(
   parseJobId: string,
   sessionId: string,
   attributed: AttributedReceipt,
+  /** ISO 4217 code from the parser; empty/undefined leaves the column
+   *  untouched (don't overwrite a previously-stamped good value with
+   *  a worse "unknown" from a retry). */
+  currency?: string,
 ): Promise<void> {
   // Assign stable ids; map a parent's lineNo → its row id so an IRC
   // line's `ircAttributedTo` (a lineNo) becomes the parent's row id.
@@ -73,5 +77,11 @@ export async function persistReceiptLines(
       .where(eq(receiptLines.parseJobId, parseJobId));
     if (rows.length === 0) return;
     await tx.insert(receiptLines).values(rows);
+    if (currency && currency.length > 0) {
+      await tx
+        .update(sessions)
+        .set({ currency })
+        .where(eq(sessions.id, sessionId));
+    }
   });
 }

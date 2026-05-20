@@ -115,6 +115,7 @@ export default async function ReviewPage({ params, searchParams }: Ctx) {
       <StickySubtotalBar
         parsedSumCents={summary.parsedSumCents}
         reconciliation={reconciliation}
+        currency={summary.currency}
       />
       {/* Story 2.6 — unverified force-pass banner (FR15 propagation). */}
       <UnverifiedBanner unverified={summary.unverified} />
@@ -155,6 +156,7 @@ export default async function ReviewPage({ params, searchParams }: Ctx) {
             <ReceiptLineRow
               key={l.id}
               line={l}
+              currency={summary.currency}
               suspicious={suspiciousByLine.get(l.id)}
               editHref={
                 !editingLineId
@@ -165,25 +167,17 @@ export default async function ReviewPage({ params, searchParams }: Ctx) {
           );
         })}
       </ol>
-      {/* Story 2.5 — manual printed-total input (FR13 escape hatch). */}
       <PrintedTotalForm
         linkId={linkId}
         currentCents={summary.printedTotalCents}
+        currency={summary.currency}
       />
-      {/* Story 2.3 — append a new product line. */}
       <AddLineForm linkId={linkId} />
-      {/* Story 2.6 — FR14 escape hatch (二次確認 + 明示後果). */}
       <ForcePassForm
         linkId={linkId}
         currentlyUnverified={summary.unverified}
       />
-      {/* Story 2.7 — always-forward gate; canProgress ensures no
-          state is a dead end (FR16 / NFR-R2). */}
       <NextStepGate linkId={linkId} state={reconciliation.state} />
-      <footer className="px-4 py-4 text-xs text-muted-foreground border-t">
-        Epic 2 完成（核對閘門 FR8–16）。連結（Epic 3）／認領（Epic 4）／
-        結算（Epic 5）／生命週期（Epic 6）由後續 epic 接續。
-      </footer>
     </main>
   );
 }

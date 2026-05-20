@@ -10,10 +10,12 @@
  * payer's escape hatch.
  */
 import { setPrintedTotalAction } from "@/features/reconciliation/server/actions";
+import { CURRENCY_PREFIX } from "@/features/reconciliation/lib/formatCents";
 
 interface Props {
   linkId: string;
   currentCents: number | null;
+  currency: string | null;
 }
 
 function dollarsString(cents: number | null): string {
@@ -24,12 +26,16 @@ function dollarsString(cents: number | null): string {
   return `${cents < 0 ? "-" : ""}${whole}.${frac}`;
 }
 
-export function PrintedTotalForm({ linkId, currentCents }: Props) {
+export function PrintedTotalForm({ linkId, currentCents, currency }: Props) {
   const bound = setPrintedTotalAction.bind(null, linkId);
   const summaryLabel =
     currentCents === null
-      ? "📝 手動輸入印製總額（FR13 逃生口）"
+      ? "📝 手動輸入印製總額"
       : `📝 已手動輸入印製總額（可調整）`;
+  const prefix =
+    currency && currency.length > 0
+      ? (CURRENCY_PREFIX[currency.toUpperCase()] ?? "")
+      : "";
   return (
     <details open={currentCents === null} className="border-t border-border">
       <summary className="px-4 py-3 cursor-pointer text-sm font-medium hover:bg-accent/50">
@@ -38,7 +44,7 @@ export function PrintedTotalForm({ linkId, currentCents }: Props) {
       <form action={bound} className="px-4 py-3 flex flex-col gap-2 text-sm">
         <label className="flex flex-col gap-1">
           <span className="text-xs text-muted-foreground">
-            印製總額 NT$（空白＝清除）
+            印製總額{prefix ? ` ${prefix}` : ""}（空白＝清除）
           </span>
           <input
             name="printedTotal"

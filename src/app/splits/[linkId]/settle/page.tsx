@@ -47,6 +47,7 @@ export default async function SettlePage({ params }: Ctx) {
     parsedSumCents: view.parsedSumCents,
     printedTotalCents: view.printedTotalCents,
     unverified: view.unverified,
+    currency: view.currency,
     perIdentity: view.perIdentity.map((p) => ({ name: p.name, cents: p.cents })),
     pendingCents: view.pendingCents,
     orphanIrcCents: view.orphanIrcCents,
@@ -56,9 +57,6 @@ export default async function SettlePage({ params }: Ctx) {
     <main className="min-h-dvh max-w-md mx-auto flex flex-col gap-4 px-4 py-6">
       <header>
         <h1 className="text-lg font-semibold">結算</h1>
-        <p className="text-xs text-muted-foreground">
-          deterministic FR50 settle.ts — Σ 每人 + 待認領 + 孤兒 IRC = 解析總額。
-        </p>
       </header>
       <SettlementSummary {...view} />
       <ExportPlaintextActions shareText={shareText} />

@@ -154,8 +154,23 @@ export const ReceiptLineSchema = z.object({
 });
 export type ReceiptLine = z.infer<typeof ReceiptLineSchema>;
 
+/**
+ * ISO 4217 currency code (3 uppercase letters). Stored on `sessions`
+ * after a successful parse so the UI can format amounts with the right
+ * symbol (CNY → ¥, TWD → NT$, USD → US$, etc.). Empty/missing means
+ * "unknown" — the LLM was unable to determine the receipt's currency;
+ * the UI degrades to no prefix rather than guessing.
+ */
+export const CurrencyCodeSchema = z
+  .string()
+  .regex(/^[A-Z]{3}$/, "Currency must be a 3-letter ISO 4217 code");
+export type CurrencyCode = z.infer<typeof CurrencyCodeSchema>;
+
 /** The full structured parse result the LLM must return (AC3). */
 export const ParsedReceiptSchema = z.object({
+  /** Currency the receipt is denominated in. Empty string ("") means
+   *  the LLM could not determine it from the image. */
+  currency: z.union([CurrencyCodeSchema, z.literal("")]).optional(),
   lines: z.array(ReceiptLineSchema),
 });
 export type ParsedReceipt = z.infer<typeof ParsedReceiptSchema>;
@@ -172,6 +187,11 @@ export const PARSED_RECEIPT_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
   properties: {
+    currency: {
+      type: "string",
+      description:
+        "ISO 4217 3-letter currency code from the receipt (CNY/TWD/USD/JPY/HKD/KRW/EUR/GBP/...). Empty string if unknown.",
+    },
     lines: {
       type: "array",
       items: {
@@ -187,5 +207,5 @@ export const PARSED_RECEIPT_JSON_SCHEMA = {
       },
     },
   },
-  required: ["lines"],
+  required: ["currency", "lines"],
 } as const;

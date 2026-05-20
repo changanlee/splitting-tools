@@ -31,6 +31,7 @@ interface Props {
   netCents: number;
   claimers: Claimer[];
   myIdentityId: string;
+  currency: string | null;
 }
 
 function subscribeNoop(): () => void {
@@ -51,6 +52,7 @@ export function ClaimRow({
   netCents,
   claimers,
   myIdentityId,
+  currency,
 }: Props) {
   const token = useSyncExternalStore(
     subscribeNoop,
@@ -129,7 +131,7 @@ export function ClaimRow({
         </form>
       ) : null}
       <span className="tabular-nums text-sm font-semibold shrink-0">
-        {formatCents(netCents)}
+        {formatCents(netCents, { currency })}
       </span>
     </li>
   );

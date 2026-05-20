@@ -52,6 +52,7 @@ interface Props {
   lines: LineProp[];
   claims: ClaimProp[];
   unverified: boolean;
+  currency: string | null;
 }
 
 export function ClaimBoardBody({
@@ -61,6 +62,7 @@ export function ClaimBoardBody({
   lines,
   claims,
   unverified,
+  currency,
 }: Props) {
   const linesForMath: LineForShare[] = lines.map((l) => ({
     id: l.id,
@@ -104,7 +106,7 @@ export function ClaimBoardBody({
       >
         <span>嗨 {myName}，我應付</span>
         <span className="ml-auto text-lg font-semibold">
-          {formatCents(mySubtotal)}
+          {formatCents(mySubtotal, { currency })}
         </span>
       </div>
       {unverified ? (
@@ -124,6 +126,7 @@ export function ClaimBoardBody({
             lineNo={l.lineNo}
             description={l.description}
             netCents={l.netCents}
+            currency={currency}
             claimers={(claimsByLine.get(l.id) ?? []).map((c) => ({
               identityId: c.identityId,
               identityName: c.identityName,

@@ -68,6 +68,7 @@ export default async function SharePage({ params }: Ctx) {
     printedTotalCents: summary.printedTotalCents,
     unverified: summary.unverified,
     lineCount: summary.lineCount,
+    currency: summary.currency,
   };
   const shareText = buildShareText(cardProps);
 
@@ -87,9 +88,6 @@ export default async function SharePage({ params }: Ctx) {
       >
         ← 回核對閘門
       </a>
-      <footer className="px-1 py-3 text-xs text-muted-foreground border-t">
-        Story 3.2/3.3 完成（訊息卡 + 分享/複製）。Story 4.1 之後分享連結將指向認領頁。
-      </footer>
     </main>
   );
 }

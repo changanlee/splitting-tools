@@ -20,6 +20,8 @@ import { formatCents } from "@/features/reconciliation/lib/formatCents";
 interface Props {
   parsedSumCents: number;
   reconciliation: ReconciliationResult;
+  /** ISO 4217 currency code from the parsed receipt. */
+  currency: string | null;
 }
 
 const STATE_STYLES = {
@@ -49,32 +51,35 @@ const STATE_STYLES = {
   },
 } as const;
 
-export function StickySubtotalBar({ parsedSumCents, reconciliation }: Props) {
+export function StickySubtotalBar({
+  parsedSumCents,
+  reconciliation,
+  currency,
+}: Props) {
   const s = STATE_STYLES[reconciliation.state];
-  const parsedText = formatCents(parsedSumCents);
+  const fmt = (c: number, signed = false) =>
+    formatCents(c, { currency, signed });
+  const parsedText = fmt(parsedSumCents);
 
   let detail: string;
   if (reconciliation.state === "verified") {
     detail = `解析 ${parsedText} ✓ 對得上印製總額`;
   } else if (reconciliation.state === "mismatch") {
     const delta = reconciliation.mismatchCents ?? 0;
-    const absDeltaText = formatCents(Math.abs(delta));
+    const absDeltaText = fmt(Math.abs(delta));
     const framing = delta > 0 ? "解析比印製多" : "解析比印製少";
     detail = `解析 ${parsedText}  ${framing} ${absDeltaText}`;
   } else if (reconciliation.state === "unverified") {
-    // Story 2.6 — explicit "未經對帳驗證" override. Show the
-    // underlying delta if available so the payer can still see what
-    // they bypassed.
     const delta = reconciliation.mismatchCents;
     if (delta !== null && delta !== 0) {
-      const absDeltaText = formatCents(Math.abs(delta));
+      const absDeltaText = fmt(Math.abs(delta));
       const framing = delta > 0 ? "解析比印製多" : "解析比印製少";
       detail = `⚠ 未經對帳驗證 · 解析 ${parsedText}（${framing} ${absDeltaText}）`;
     } else {
       detail = `⚠ 未經對帳驗證 · 解析 ${parsedText}`;
     }
   } else {
-    detail = `解析 ${parsedText} · 待輸入印製總額（Story 2.5 處理）`;
+    detail = `解析 ${parsedText} · 請輸入印製總額`;
   }
 
   return (

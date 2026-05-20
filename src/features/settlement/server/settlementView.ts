@@ -20,6 +20,8 @@ export interface SettlementView {
   unverified: boolean;
   printedTotalCents: number | null;
   parsedSumCents: number;
+  /** ISO 4217 stamped by the parser; null when unknown. */
+  currency: string | null;
   /** Ordered (largest amount first) — same iteration in plaintext export. */
   perIdentity: { identityId: string; name: string; cents: number }[];
   pendingCents: number;
@@ -35,6 +37,7 @@ export async function getSettlementView(
       status: sessions.status,
       unverified: sessions.unverified,
       printedTotalCents: sessions.printedTotalCents,
+      currency: sessions.currency,
     })
     .from(sessions)
     .where(eq(sessions.id, sessionId))
@@ -96,6 +99,7 @@ export async function getSettlementView(
     unverified: sessRows[0].unverified,
     printedTotalCents: sessRows[0].printedTotalCents,
     parsedSumCents,
+    currency: sessRows[0].currency,
     perIdentity,
     pendingCents: r.pendingCents,
     orphanIrcCents: r.orphanIrcCents,

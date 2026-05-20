@@ -11,31 +11,34 @@ export interface PlaintextInput {
   parsedSumCents: number;
   printedTotalCents: number | null;
   unverified: boolean;
+  /** ISO 4217 from sessions.currency; null → no prefix. */
+  currency: string | null;
   perIdentity: { name: string; cents: number }[];
   pendingCents: number;
   orphanIrcCents: number;
 }
 
 export function buildSettlementText(args: PlaintextInput): string {
+  const fmt = (c: number) => formatCents(c, { currency: args.currency });
   const lines: string[] = [];
   lines.push("📑 這次的分帳");
   const headerTotal = args.printedTotalCents ?? args.parsedSumCents;
-  lines.push(`總額 ${formatCents(headerTotal)}`);
+  lines.push(`總額 ${fmt(headerTotal)}`);
   if (args.unverified) lines.push("⚠ 未經對帳驗證");
   lines.push("");
   if (args.perIdentity.length === 0) {
     lines.push("（尚無人認領）");
   } else {
     for (const p of args.perIdentity) {
-      lines.push(`${p.name}　${formatCents(p.cents)}`);
+      lines.push(`${p.name}　${fmt(p.cents)}`);
     }
   }
   if (args.pendingCents > 0) {
     lines.push("");
-    lines.push(`待認領 ${formatCents(args.pendingCents)}`);
+    lines.push(`待認領 ${fmt(args.pendingCents)}`);
   }
   if (args.orphanIrcCents !== 0) {
-    lines.push(`孤兒 IRC ${formatCents(args.orphanIrcCents)}`);
+    lines.push(`孤兒 IRC ${fmt(args.orphanIrcCents)}`);
   }
   return lines.join("\n");
 }

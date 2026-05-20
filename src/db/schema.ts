@@ -36,6 +36,10 @@ export const sessions = pgTable("sessions", {
   parsedSumCents: integer("parsed_sum_cents"),
   printedTotalCents: integer("printed_total_cents"),
   unverified: boolean("unverified").notNull().default(false),
+  // ISO 4217 currency code stamped by the parser from the receipt image
+  // (e.g. "CNY", "TWD", "USD"). Null until the first successful parse;
+  // formatCents falls back to no prefix when null.
+  currency: text("currency"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

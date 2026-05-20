@@ -84,6 +84,7 @@ export async function registerParseWorker(boss: PgBoss): Promise<void> {
                 data.jobId,
                 data.sessionId,
                 attributed,
+                outcome.receipt.currency,
               );
               persisted = true;
               await markJobStatus(

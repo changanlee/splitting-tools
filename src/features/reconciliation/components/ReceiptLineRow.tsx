@@ -22,6 +22,8 @@ import type { SuspiciousResult } from "@/features/reconciliation/suspicious";
 
 interface Props {
   line: ReceiptLineView;
+  /** ISO 4217 from the parsed receipt — drives currency prefix. */
+  currency: string | null;
   /**
    * Story 2.2: optional suspicious-line classification result.
    * When `severity==='suspicious'`, the row gets an amber border-left
@@ -37,7 +39,12 @@ interface Props {
   editHref?: string;
 }
 
-export function ReceiptLineRow({ line, suspicious, editHref }: Props) {
+export function ReceiptLineRow({
+  line,
+  currency,
+  suspicious,
+  editHref,
+}: Props) {
   const isSuspicious = suspicious?.severity === "suspicious";
   if (line.isIrc) {
     // IRC discount line: folded into its parent's net by 1.5; render
@@ -68,7 +75,7 @@ export function ReceiptLineRow({ line, suspicious, editHref }: Props) {
           ) : null}
         </span>
         <span className="tabular-nums">
-          {formatCents(line.grossCents, { signed: true })}
+          {formatCents(line.grossCents, { signed: true, currency })}
         </span>
         {editHref ? (
           <a
@@ -132,15 +139,15 @@ export function ReceiptLineRow({ line, suspicious, editHref }: Props) {
         {wasDiscounted ? (
           <>
             <span className="block text-sm font-semibold">
-              {formatCents(line.netCents)}
+              {formatCents(line.netCents, { currency })}
             </span>
             <span className="block text-xs text-muted-foreground line-through">
-              {formatCents(line.grossCents)}
+              {formatCents(line.grossCents, { currency })}
             </span>
           </>
         ) : (
           <span className="text-sm font-semibold">
-            {formatCents(line.netCents)}
+            {formatCents(line.netCents, { currency })}
           </span>
         )}
       </span>
