@@ -14,7 +14,10 @@ import { db } from "@/lib/db/client";
 import { claims } from "@/db/schema";
 import {
   findIdentityForToken,
+  isSessionOwner,
+  listIdentities,
   sessionExistsRepo,
+  type Identity,
 } from "@/features/identity/server/identityRepo";
 import { isValidDeviceToken } from "@/features/identity/deviceToken";
 import {
@@ -37,7 +40,20 @@ const FRIENDLY_AUTH = "請先選擇你的身份再認領（4.1 認領入口）�
 const FRIENDLY_NOT_FOUND = "找不到這個分帳或品項，請重新整理。";
 const FRIENDLY_UNEXPECTED = "暫時無法儲存認領，請稍後再試。";
 
-async function resolveIdentity(linkId: string, rawToken: string) {
+/**
+ * Resolve which identity a claim write applies to.
+ *
+ * Feature B authz: when `targetIdentityId` is given, the caller must
+ * be the session OWNER to act on someone else (pre-allocation) — the
+ * owner may write any identity's claims. A non-owner may only ever
+ * write their own identity. With no `targetIdentityId` the action is
+ * the classic self-service path (caller's own device-bound identity).
+ */
+async function resolveActingIdentity(
+  linkId: string,
+  rawToken: string,
+  targetIdentityId?: string,
+): Promise<Identity> {
   if (!isValidLinkId(linkId)) throw new Error(FRIENDLY_NOT_FOUND);
   if (!isValidDeviceToken(rawToken)) throw new Error(FRIENDLY_INVALID);
   const sessionOk = await sessionExistsRepo(linkId);
@@ -51,9 +67,25 @@ async function resolveIdentity(linkId: string, rawToken: string) {
   if (statusRows[0] && isFrozen(statusRows[0].status)) {
     throw new Error(FRIENDLY_FROZEN);
   }
-  const identity = await findIdentityForToken(linkId, rawToken);
-  if (!identity) throw new Error(FRIENDLY_AUTH);
-  return identity;
+
+  const own = await findIdentityForToken(linkId, rawToken);
+
+  if (targetIdentityId && targetIdentityId.length > 0) {
+    // Acting on a specific identity: allowed if it IS the caller's own
+    // identity, OR the caller is the session owner (pre-allocation).
+    if (own && own.id === targetIdentityId) return own;
+    const owner = await isSessionOwner(linkId, rawToken);
+    if (!owner) throw new Error(FRIENDLY_AUTH);
+    const target = (await listIdentities(linkId)).find(
+      (i) => i.id === targetIdentityId,
+    );
+    if (!target) throw new Error(FRIENDLY_NOT_FOUND);
+    return target;
+  }
+
+  // Self-service path — caller's own device-bound identity.
+  if (!own) throw new Error(FRIENDLY_AUTH);
+  return own;
 }
 
 export async function toggleClaimAction(
@@ -62,8 +94,13 @@ export async function toggleClaimAction(
   formData: FormData,
 ): Promise<void> {
   const rawToken = String(formData.get("deviceToken") ?? "");
+  const targetIdentityId = String(formData.get("targetIdentityId") ?? "");
   try {
-    const identity = await resolveIdentity(linkId, rawToken);
+    const identity = await resolveActingIdentity(
+      linkId,
+      rawToken,
+      targetIdentityId,
+    );
     const lineOk = await lineBelongsToSession(linkId, receiptLineId);
     if (!lineOk) throw new Error(FRIENDLY_NOT_FOUND);
 
@@ -100,13 +137,18 @@ export async function setClaimWeightAction(
   formData: FormData,
 ): Promise<void> {
   const rawToken = String(formData.get("deviceToken") ?? "");
+  const targetIdentityId = String(formData.get("targetIdentityId") ?? "");
   const raw = String(formData.get("weight") ?? "");
   const weight = Number.parseInt(raw, 10);
   if (!Number.isInteger(weight) || weight < 1 || weight > 1000) {
     throw new Error(FRIENDLY_INVALID);
   }
   try {
-    const identity = await resolveIdentity(linkId, rawToken);
+    const identity = await resolveActingIdentity(
+      linkId,
+      rawToken,
+      targetIdentityId,
+    );
     await db
       .update(claims)
       .set({ weight })
@@ -149,8 +191,13 @@ export async function undoLastClaimAction(
   formData: FormData,
 ): Promise<void> {
   const rawToken = String(formData.get("deviceToken") ?? "");
+  const targetIdentityId = String(formData.get("targetIdentityId") ?? "");
   try {
-    const identity = await resolveIdentity(linkId, rawToken);
+    const identity = await resolveActingIdentity(
+      linkId,
+      rawToken,
+      targetIdentityId,
+    );
     const latest = await latestChangeForIdentity(linkId, identity.id);
     if (!latest) {
       throw new Error("沒有可撤銷的動作。");

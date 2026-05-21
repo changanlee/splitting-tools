@@ -22,8 +22,15 @@ const TERMINAL: string[] = ["succeeded", "failed", "degraded"];
  * Create a split session. The id IS the linkId. The canonical
  * unguessable-link scheme is Story 3.1 — this server-generated UUID is
  * a non-guessable placeholder 3.1 will formalize (not pre-empted here).
+ *
+ * `creatorTokenHash` (Feature B) — the sha256 of the payer's device
+ * token, recorded so the payer can later be recognised as the session
+ * owner (pre-allocate claims for anyone). Optional: a missing token
+ * just means owner-mode is unavailable for that session.
  */
-export async function createSession(): Promise<string> {
+export async function createSession(
+  creatorTokenHash?: string | null,
+): Promise<string> {
   // Story 3.1 — 16-byte crypto-random → base64url (≥128-bit entropy;
   // NFR-S1). Architecture L256-258 explicitly rejects UUIDv4. The
   // returned id IS the link.
@@ -33,7 +40,11 @@ export async function createSession(): Promise<string> {
   const now = new Date();
   await db
     .insert(sessions)
-    .values({ id, expiresAt: expiresAt(now) })
+    .values({
+      id,
+      expiresAt: expiresAt(now),
+      creatorTokenHash: creatorTokenHash ?? null,
+    })
     .onConflictDoNothing();
   return id;
 }

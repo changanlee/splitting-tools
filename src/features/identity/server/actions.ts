@@ -17,36 +17,95 @@ import { redirect } from "next/navigation";
 import { isValidDeviceToken } from "@/features/identity/deviceToken";
 import {
   createIdentity,
+  createNamedIdentity,
   findIdentityForToken,
   hashDeviceToken,
+  isSessionOwner,
   listIdentities,
   sessionExistsRepo,
 } from "@/features/identity/server/identityRepo";
 import { isValidLinkId } from "@/lib/linkId";
 
+export interface MyIdentityResult {
+  identity: { id: string; name: string } | null;
+  /** Feature B — caller's device created this session (the payer). */
+  isOwner: boolean;
+}
+
 /**
  * Resolve "who am I on this session" given the caller's raw device
- * token. Pure read; never mutates. Used by ClaimPageBody from the
- * client — keeping the hashing on the server side avoids the
- * `crypto.subtle` secure-context requirement that breaks identity
- * resolution over plain HTTP on iOS Safari (LAN dev).
+ * token + whether the caller is the session owner. Pure read; never
+ * mutates. Used by ClaimPageBody from the client — keeping the hashing
+ * on the server side avoids the `crypto.subtle` secure-context
+ * requirement that breaks identity resolution over plain HTTP on iOS
+ * Safari (LAN dev).
  */
 export async function resolveMyIdentityAction(
   linkId: string,
   rawToken: string,
-): Promise<{ id: string; name: string } | null> {
-  if (!isValidLinkId(linkId)) return null;
-  if (!isValidDeviceToken(rawToken)) return null;
+): Promise<MyIdentityResult> {
+  if (!isValidLinkId(linkId) || !isValidDeviceToken(rawToken)) {
+    return { identity: null, isOwner: false };
+  }
   try {
-    const match = await findIdentityForToken(linkId, rawToken);
-    return match ? { id: match.id, name: match.name } : null;
+    const [match, owner] = await Promise.all([
+      findIdentityForToken(linkId, rawToken),
+      isSessionOwner(linkId, rawToken),
+    ]);
+    return {
+      identity: match ? { id: match.id, name: match.name } : null,
+      isOwner: owner,
+    };
   } catch (e) {
     console.error(
       "[resolveMyIdentityAction] failed:",
       e instanceof Error ? e.message : String(e),
     );
-    return null;
+    return { identity: null, isOwner: false };
   }
+}
+
+const FRIENDLY_OWNER_ONLY = "只有發起人可以代為新增認領的人。";
+
+/**
+ * Feature B — the session owner adds a named person (a tokenless
+ * identity) so they can pre-allocate claims to them. The person's
+ * device token binds later when they open the link and pick this name
+ * via the "是不是你" picker.
+ */
+export async function addPersonAction(
+  linkId: string,
+  formData: FormData,
+): Promise<void> {
+  if (!isValidLinkId(linkId)) throw new Error(FRIENDLY_NOT_FOUND);
+  const rawToken = String(formData.get("deviceToken") ?? "");
+  if (!isValidDeviceToken(rawToken)) throw new Error(FRIENDLY_INVALID);
+  const name = String(formData.get("name") ?? "").trim();
+  if (name.length < 1 || name.length > 30) {
+    throw new Error(FRIENDLY_INVALID);
+  }
+  try {
+    const sessionOk = await sessionExistsRepo(linkId);
+    if (!sessionOk) throw new Error(FRIENDLY_NOT_FOUND);
+    const owner = await isSessionOwner(linkId, rawToken);
+    if (!owner) throw new Error(FRIENDLY_OWNER_ONLY);
+    await createNamedIdentity(linkId, name);
+  } catch (e) {
+    if (
+      e instanceof Error &&
+      [FRIENDLY_INVALID, FRIENDLY_NOT_FOUND, FRIENDLY_OWNER_ONLY].includes(
+        e.message,
+      )
+    ) {
+      throw e;
+    }
+    console.error(
+      "[addPersonAction] failed:",
+      e instanceof Error ? e.message : String(e),
+    );
+    throw new Error(FRIENDLY_UNEXPECTED);
+  }
+  redirect(`/splits/${linkId}/claim`);
 }
 
 const FRIENDLY_INVALID = "輸入內容格式不正確，請確認後再試。";

@@ -34,6 +34,7 @@ import {
   CreateSessionResponseSchema,
   ParseSubmitResponseSchema,
 } from "@/features/parsing/schema";
+import { getOrCreateDeviceToken } from "@/features/identity/deviceToken";
 import {
   addPage,
   allPagesDecided,
@@ -205,7 +206,14 @@ export function CaptureFlow() {
     let linkId = existingLinkId;
     try {
       if (!linkId) {
-        const sRes = await fetch("/api/splits", { method: "POST" });
+        // Send our device token so the server records us as the
+        // session owner (Feature B — payer can pre-allocate claims).
+        const deviceToken = getOrCreateDeviceToken();
+        const sRes = await fetch("/api/splits", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(deviceToken ? { deviceToken } : {}),
+        });
         if (!sRes.ok) throw new Error("session");
         linkId = CreateSessionResponseSchema.parse(await sRes.json()).linkId;
       }

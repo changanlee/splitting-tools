@@ -17,7 +17,8 @@ export interface Identity {
   id: string;
   sessionId: string;
   name: string;
-  deviceTokenHash: string;
+  /** Null = an owner-pre-created identity not yet bound to a device. */
+  deviceTokenHash: string | null;
 }
 
 export async function listIdentities(sessionId: string): Promise<Identity[]> {
@@ -77,6 +78,45 @@ export async function createIdentity(
     deviceTokenHash,
   });
   return { id, sessionId, name, deviceTokenHash };
+}
+
+/**
+ * Create a NAMED identity with no device token (Feature B) — the
+ * session owner pre-allocates for a person who hasn't joined. The
+ * device token is bound later when that person opens the link and
+ * picks this name via the "是不是你" picker.
+ */
+export async function createNamedIdentity(
+  sessionId: string,
+  name: string,
+): Promise<Identity> {
+  const id = randomUUID();
+  await db.insert(identities).values({
+    id,
+    sessionId,
+    name,
+    deviceTokenHash: null,
+  });
+  return { id, sessionId, name, deviceTokenHash: null };
+}
+
+/**
+ * Feature B — is the caller's device the session creator (the payer)?
+ * The owner may mutate any identity's claims; members only their own.
+ * False when the session has no recorded creator (legacy / unknown).
+ */
+export async function isSessionOwner(
+  sessionId: string,
+  rawToken: string,
+): Promise<boolean> {
+  const rows = await db
+    .select({ creatorTokenHash: sessions.creatorTokenHash })
+    .from(sessions)
+    .where(eq(sessions.id, sessionId))
+    .limit(1);
+  const creatorHash = rows[0]?.creatorTokenHash;
+  if (!creatorHash) return false;
+  return hashDeviceToken(rawToken) === creatorHash;
 }
 
 export async function sessionExistsRepo(sessionId: string): Promise<boolean> {

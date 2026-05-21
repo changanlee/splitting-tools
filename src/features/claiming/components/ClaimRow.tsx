@@ -33,7 +33,10 @@ interface Props {
    *  and the weight input means "how many shares you took". */
   shareCount: number;
   claimers: Claimer[];
-  myIdentityId: string;
+  /** The identity this row's checkbox claims FOR — the caller's own
+   *  identity in self-service mode, or the owner's selected "acting
+   *  as" person. Sent to the server as `targetIdentityId`. */
+  actingIdentityId: string;
   currency: string | null;
 }
 
@@ -55,7 +58,7 @@ export function ClaimRow({
   netCents,
   shareCount,
   claimers,
-  myIdentityId,
+  actingIdentityId,
   currency,
 }: Props) {
   const multiShare = shareCount > 1;
@@ -69,9 +72,9 @@ export function ClaimRow({
     getTokenSnapshot,
     getServerTokenSnapshot,
   );
-  const iClaimed = claimers.some((c) => c.identityId === myIdentityId);
+  const iClaimed = claimers.some((c) => c.identityId === actingIdentityId);
   const myWeight =
-    claimers.find((c) => c.identityId === myIdentityId)?.weight ?? 1;
+    claimers.find((c) => c.identityId === actingIdentityId)?.weight ?? 1;
 
   const toggleBound = toggleClaimAction.bind(null, linkId, lineId);
   const weightBound = setClaimWeightAction.bind(null, linkId, lineId);
@@ -87,6 +90,11 @@ export function ClaimRow({
         {token ? (
           <input type="hidden" name="deviceToken" value={token} />
         ) : null}
+        <input
+          type="hidden"
+          name="targetIdentityId"
+          value={actingIdentityId}
+        />
         <button
           type="submit"
           aria-label={iClaimed ? "取消認領" : "認領"}
@@ -123,6 +131,11 @@ export function ClaimRow({
           {token ? (
             <input type="hidden" name="deviceToken" value={token} />
           ) : null}
+          <input
+            type="hidden"
+            name="targetIdentityId"
+            value={actingIdentityId}
+          />
           <label
             className={multiShare ? "text-xs text-muted-foreground" : "sr-only"}
             htmlFor={`w-${lineId}`}

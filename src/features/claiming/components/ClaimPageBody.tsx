@@ -56,20 +56,18 @@ interface Props {
 
 type ResolveState =
   | { status: "pending" }
-  | { status: "resolved"; id: string | null; name: string };
+  | { status: "resolved"; id: string | null; isOwner: boolean };
 
 type ResolveAction =
   | { type: "noToken" }
-  | { type: "match"; id: string; name: string }
-  | { type: "noMatch" };
+  | { type: "resolved"; id: string | null; isOwner: boolean };
 
 function reducer(_state: ResolveState, action: ResolveAction): ResolveState {
   switch (action.type) {
     case "noToken":
-    case "noMatch":
-      return { status: "resolved", id: null, name: "" };
-    case "match":
-      return { status: "resolved", id: action.id, name: action.name };
+      return { status: "resolved", id: null, isOwner: false };
+    case "resolved":
+      return { status: "resolved", id: action.id, isOwner: action.isOwner };
   }
 }
 
@@ -104,20 +102,20 @@ export function ClaimPageBody({
         // plain-HTTP origins (LAN dev). The raw token only crosses the
         // wire here as it already does for create/pick; the server
         // hashes and never persists raw.
-        const match = await resolveMyIdentityAction(linkId, token);
+        const r = await resolveMyIdentityAction(linkId, token);
         if (cancelled) return;
-        if (match) {
-          dispatch({ type: "match", id: match.id, name: match.name });
-        } else {
-          dispatch({ type: "noMatch" });
-        }
+        dispatch({
+          type: "resolved",
+          id: r.identity?.id ?? null,
+          isOwner: r.isOwner,
+        });
       } catch (e) {
         if (cancelled) return;
         console.error(
           "[ClaimPageBody] identity resolve failed:",
           e instanceof Error ? e.message : String(e),
         );
-        dispatch({ type: "noMatch" });
+        dispatch({ type: "resolved", id: null, isOwner: false });
       }
     })();
     return () => {
@@ -128,14 +126,18 @@ export function ClaimPageBody({
   if (state.status === "pending") {
     return <p className="text-sm text-muted-foreground">正在確認你的身份…</p>;
   }
-  if (state.id === null) {
+  // A non-owner with no identity yet → the "是不是你" picker.
+  if (state.id === null && !state.isOwner) {
     return <IdentityPicker linkId={linkId} existing={existing} />;
   }
+  // Owner (with or without their own identity) OR a bound member →
+  // the claim board. Owner mode unlocks the act-as / add-person UI.
   return (
     <ClaimBoardBody
       linkId={linkId}
+      isOwner={state.isOwner}
+      allIdentities={existing}
       myIdentityId={state.id}
-      myName={state.name}
       lines={lines}
       claims={claims}
       unverified={unverified}

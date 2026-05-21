@@ -40,6 +40,11 @@ export const sessions = pgTable("sessions", {
   // (e.g. "CNY", "TWD", "USD"). Null until the first successful parse;
   // formatCents falls back to no prefix when null.
   currency: text("currency"),
+  // sha256 of the device token that CREATED this session — i.e. the
+  // payer. The owner can mutate any identity's claims (pre-allocate);
+  // members can only mutate their own. Null = legacy/unknown creator,
+  // falls back to self-only authz everywhere.
+  creatorTokenHash: text("creator_token_hash"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -174,9 +179,12 @@ export const receiptLines = pgTable(
 );
 
 /**
- * Identities — Story 4.1/4.2. One person (claimant) per session,
- * bound to a device token (`device_token_hash` = sha256 of the
- * raw token; raw never persisted — NFR-S3 privacy).
+ * Identities — Story 4.1/4.2. One person (claimant) per session.
+ * `device_token_hash` = sha256 of the raw token (raw never persisted
+ * — NFR-S3). NULLABLE: the session owner can pre-create a named
+ * identity for someone who hasn't joined yet (Feature B, 2026-05-21);
+ * the hash is filled in when that person opens the link and binds via
+ * the "是不是你" picker.
  *
  * Linked to sessions only; no global user table.
  */
@@ -188,7 +196,7 @@ export const identities = pgTable(
       .notNull()
       .references(() => sessions.id),
     name: text("name").notNull(),
-    deviceTokenHash: text("device_token_hash").notNull(),
+    deviceTokenHash: text("device_token_hash"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
