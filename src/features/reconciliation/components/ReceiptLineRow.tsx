@@ -126,6 +126,11 @@ export function ReceiptLineRow({
             可疑（{suspicious!.flags.join("、")}）
           </span>
         ) : null}
+        {line.shareCount > 1 ? (
+          <span className="block text-xs text-primary font-medium">
+            拆 {line.shareCount} 份認領
+          </span>
+        ) : null}
         {line.rawText ? (
           <span className="block text-xs text-muted-foreground truncate">
             {line.rawText}

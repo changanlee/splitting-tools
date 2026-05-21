@@ -21,16 +21,54 @@ export function ShareActions({ shareText, shareUrl }: Props) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * `navigator.clipboard` is gated by the Secure Contexts spec — it is
+   * undefined on plain-HTTP origins (LAN dev on iOS Safari). Fall back
+   * to the legacy `document.execCommand('copy')` via a hidden textarea,
+   * which still works in non-secure contexts.
+   */
+  function execCommandCopy(text: string): boolean {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.top = "0";
+      ta.style.left = "0";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      ta.setSelectionRange(0, text.length);
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+
   async function onCopy() {
     setError(null);
+    // Try the modern API first; fall back to execCommand on plain HTTP.
     try {
-      await navigator.clipboard.writeText(shareText);
-      setCopied(true);
-      // Reset the affordance after a short window so a second copy
-      // also shows feedback.
-      window.setTimeout(() => setCopied(false), 2000);
+      if (
+        typeof navigator !== "undefined" &&
+        navigator.clipboard?.writeText
+      ) {
+        await navigator.clipboard.writeText(shareText);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 2000);
+        return;
+      }
     } catch {
-      setError("無法複製到剪貼簿，請手動選取連結。");
+      // Fall through to execCommand.
+    }
+    if (execCommandCopy(shareText)) {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } else {
+      setError("無法複製到剪貼簿，請長按連結手動選取。");
     }
   }
 

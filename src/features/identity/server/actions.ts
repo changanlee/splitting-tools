@@ -66,6 +66,7 @@ export async function resolveMyIdentityAction(
 }
 
 const FRIENDLY_OWNER_ONLY = "只有發起人可以代為新增認領的人。";
+const FRIENDLY_DUP_NAME = "已經有同名的人了，請用不同的名字。";
 
 /**
  * Feature B — the session owner adds a named person (a tokenless
@@ -89,13 +90,22 @@ export async function addPersonAction(
     if (!sessionOk) throw new Error(FRIENDLY_NOT_FOUND);
     const owner = await isSessionOwner(linkId, rawToken);
     if (!owner) throw new Error(FRIENDLY_OWNER_ONLY);
+    // Reject a duplicate name — two same-named identities are
+    // indistinguishable in the act-as selector and the claimer list.
+    const existing = await listIdentities(linkId);
+    if (existing.some((i) => i.name.trim() === name)) {
+      throw new Error(FRIENDLY_DUP_NAME);
+    }
     await createNamedIdentity(linkId, name);
   } catch (e) {
     if (
       e instanceof Error &&
-      [FRIENDLY_INVALID, FRIENDLY_NOT_FOUND, FRIENDLY_OWNER_ONLY].includes(
-        e.message,
-      )
+      [
+        FRIENDLY_INVALID,
+        FRIENDLY_NOT_FOUND,
+        FRIENDLY_OWNER_ONLY,
+        FRIENDLY_DUP_NAME,
+      ].includes(e.message)
     ) {
       throw e;
     }
@@ -142,6 +152,13 @@ export async function pickOrCreateIdentityAction(
       // this session — if so, just go through (idempotent click).
       const existing = await findIdentityForToken(linkId, rawToken);
       if (!existing) {
+        // Reject a duplicate name — if the owner pre-created this
+        // name, the friend should PICK it ("是不是你"), not make a
+        // second same-named identity.
+        const all = await listIdentities(linkId);
+        if (all.some((i) => i.name.trim() === name)) {
+          throw new Error(FRIENDLY_DUP_NAME);
+        }
         await createIdentity(linkId, name, rawToken);
       }
     } else {
@@ -166,7 +183,9 @@ export async function pickOrCreateIdentityAction(
   } catch (e) {
     if (
       e instanceof Error &&
-      (e.message === FRIENDLY_INVALID || e.message === FRIENDLY_NOT_FOUND)
+      [FRIENDLY_INVALID, FRIENDLY_NOT_FOUND, FRIENDLY_DUP_NAME].includes(
+        e.message,
+      )
     ) {
       throw e;
     }

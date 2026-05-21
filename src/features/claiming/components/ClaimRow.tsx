@@ -76,6 +76,12 @@ export function ClaimRow({
   const myWeight =
     claimers.find((c) => c.identityId === actingIdentityId)?.weight ?? 1;
 
+  // 防呆 — a multi-share line claimed for MORE shares than it has.
+  // Not blocked (the math still resolves), but flagged so the owner
+  // notices someone double-took.
+  const totalClaimedShares = claimers.reduce((s, c) => s + c.weight, 0);
+  const overClaimed = multiShare && totalClaimedShares > shareCount;
+
   const toggleBound = toggleClaimAction.bind(null, linkId, lineId);
   const weightBound = setClaimWeightAction.bind(null, linkId, lineId);
 
@@ -125,6 +131,11 @@ export function ClaimRow({
             尚未認領
           </span>
         )}
+        {overClaimed ? (
+          <span className="block text-xs font-medium text-amber-700 dark:text-amber-300">
+            ⚠ 超額認領：已認 {totalClaimedShares} 份 / 共 {shareCount} 份
+          </span>
+        ) : null}
       </span>
       {iClaimed ? (
         <form action={weightBound} className="flex items-center gap-1">
