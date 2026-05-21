@@ -36,7 +36,6 @@ interface LineProp {
   lineNo: number;
   description: string;
   netCents: number;
-  qty: number;
 }
 
 interface ClaimProp {
@@ -68,7 +67,6 @@ export function ClaimBoardBody({
   const linesForMath: LineForShare[] = lines.map((l) => ({
     id: l.id,
     netCents: l.netCents,
-    qty: l.qty,
   }));
   const claimsForMath: ClaimForShare[] = claims.map((c) => ({
     receiptLineId: c.receiptLineId,
@@ -76,7 +74,7 @@ export function ClaimBoardBody({
     weight: c.weight,
   }));
   const subtotals = computeSubtotals(linesForMath, claimsForMath);
-  const mySubtotal = subtotals.byIdentity.get(myIdentityId) ?? 0;
+  const mySubtotal = subtotals.get(myIdentityId) ?? 0;
 
   // Pending = lines with no claimers (Story 4.7 will surface them
   // more prominently; here we just count + show).

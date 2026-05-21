@@ -36,7 +36,6 @@ interface LineForBoard {
   lineNo: number;
   description: string;
   netCents: number;
-  qty: number;
 }
 
 interface Existing {

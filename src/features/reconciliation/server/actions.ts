@@ -24,6 +24,7 @@ import { randomUUID } from "node:crypto";
 
 import { and, asc, desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import { db } from "@/lib/db/client";
 import { receiptLines, sessions } from "@/db/schema";
@@ -91,6 +92,10 @@ export async function editLineAction(
   }
 
   revalidatePath(`/splits/${linkId}/review`);
+  // Drop the `?edit=` query so the inline form closes and the payer
+  // sees the updated read-only row — without this the edit form just
+  // re-renders, reading as "didn't save" even though it did.
+  redirect(`/splits/${linkId}/review`);
 }
 
 export async function deleteLineAction(
@@ -113,6 +118,7 @@ export async function deleteLineAction(
     throw new Error(FRIENDLY_UNEXPECTED);
   }
   revalidatePath(`/splits/${linkId}/review`);
+  redirect(`/splits/${linkId}/review`);
 }
 
 export async function addLineAction(
@@ -183,6 +189,7 @@ export async function addLineAction(
   }
 
   revalidatePath(`/splits/${linkId}/review`);
+  redirect(`/splits/${linkId}/review`);
 }
 
 // `asc` import retained for future ordering use cases; silence the
