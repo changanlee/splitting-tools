@@ -172,7 +172,7 @@ export default async function ReviewPage({ params, searchParams }: Ctx) {
         currentCents={summary.printedTotalCents}
         currency={summary.currency}
       />
-      <AddLineForm linkId={linkId} />
+      <AddLineForm linkId={linkId} currency={summary.currency} />
       <ForcePassForm
         linkId={linkId}
         currentlyUnverified={summary.unverified}

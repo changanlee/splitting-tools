@@ -64,6 +64,7 @@ export default async function SettlePage({ params }: Ctx) {
         linkId={linkId}
         status={view.status}
         pendingCents={view.pendingCents}
+        currency={view.currency}
       />
       <nav className="text-xs flex gap-3 pt-2 border-t border-border">
         <a

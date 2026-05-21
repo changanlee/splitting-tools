@@ -92,15 +92,12 @@ export function ParseProgress({
           <CheckCircle2Icon className="size-5 shrink-0" aria-hidden />
           {ok ? "解析完成。" : (message ?? "已完成（備援模式）。")}
         </p>
-        {/* Downstream (reconciliation Epic 2) is a later story. */}
-        <Button
-          type="button"
-          className="h-12 w-full"
-          disabled
-          title="核對閘門於 Epic 2 實作"
+        <a
+          href={`/splits/${linkId}/review`}
+          className="inline-flex h-12 w-full items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground hover:opacity-90"
         >
-          下一步：核對（即將推出）
-        </Button>
+          下一步：核對帳單 →
+        </a>
       </div>
     );
   }

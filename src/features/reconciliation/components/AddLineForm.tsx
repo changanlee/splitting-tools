@@ -3,13 +3,19 @@
  * native <details>; expands to a server-action form. No client JS.
  */
 import { addLineAction } from "@/features/reconciliation/server/actions";
+import { CURRENCY_PREFIX } from "@/features/reconciliation/lib/formatCents";
 
 interface Props {
   linkId: string;
+  currency: string | null;
 }
 
-export function AddLineForm({ linkId }: Props) {
+export function AddLineForm({ linkId, currency }: Props) {
   const bound = addLineAction.bind(null, linkId);
+  const prefix =
+    currency && currency.length > 0
+      ? (CURRENCY_PREFIX[currency.toUpperCase()] ?? "")
+      : "";
   return (
     <details className="border-t border-border">
       <summary className="px-4 py-3 cursor-pointer text-sm font-medium hover:bg-accent/50">
@@ -40,7 +46,9 @@ export function AddLineForm({ linkId }: Props) {
             />
           </label>
           <label className="flex flex-col gap-1 flex-1">
-            <span className="text-xs text-muted-foreground">金額 NT$</span>
+            <span className="text-xs text-muted-foreground">
+              金額{prefix ? ` ${prefix}` : ""}
+            </span>
             <input
               name="amount"
               inputMode="decimal"

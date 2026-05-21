@@ -3,14 +3,21 @@
  * un-finalize. Two-step confirmation via native <details>.
  */
 import { finalizeSessionAction } from "@/features/settlement/server/actions";
+import { formatCents } from "@/features/reconciliation/lib/formatCents";
 
 interface Props {
   linkId: string;
   status: string;
   pendingCents: number;
+  currency: string | null;
 }
 
-export function FinalizeForm({ linkId, status, pendingCents }: Props) {
+export function FinalizeForm({
+  linkId,
+  status,
+  pendingCents,
+  currency,
+}: Props) {
   const bound = finalizeSessionAction.bind(null, linkId);
   if (status === "finalized") {
     return (
@@ -42,7 +49,9 @@ export function FinalizeForm({ linkId, status, pendingCents }: Props) {
           {pendingCents > 0 ? (
             <>
               {" "}
-              <strong>目前還有 NT${(pendingCents / 100).toFixed(2)} 待認領</strong>
+              <strong>
+                目前還有 {formatCents(pendingCents, { currency })} 待認領
+              </strong>
               ，定案表示這筆由付款人吸收。
             </>
           ) : null}
