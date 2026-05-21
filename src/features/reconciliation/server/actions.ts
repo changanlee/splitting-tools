@@ -34,6 +34,7 @@ import {
   parseDescription,
   parseQtyInput,
 } from "@/features/reconciliation/parseInputs";
+import { recomputeNets } from "@/features/reconciliation/recompute";
 
 const FRIENDLY_INVALID = "輸入內容格式不正確，請確認後再試。";
 const FRIENDLY_NOT_FOUND = "找不到這筆品項或分帳，請重新整理。";
@@ -46,6 +47,33 @@ async function assertSession(linkId: string): Promise<void> {
     .where(eq(sessions.id, linkId))
     .limit(1);
   if (!rows[0]) throw new Error(FRIENDLY_NOT_FOUND);
+}
+
+/**
+ * Re-fold every line's `net_cents` (and IRC orphan flags) from the
+ * current `gross_cents` + `irc_attributed_to` graph. Run after any
+ * edit/add/delete so a parent's IRC discount is never silently lost
+ * — editing a line's gross/qty must NOT wipe its attributed IRC.
+ */
+async function refoldSessionNets(linkId: string): Promise<void> {
+  const rows = await db
+    .select({
+      id: receiptLines.id,
+      grossCents: receiptLines.grossCents,
+      isIrc: receiptLines.isIrc,
+      ircAttributedTo: receiptLines.ircAttributedTo,
+    })
+    .from(receiptLines)
+    .where(eq(receiptLines.sessionId, linkId));
+  const recomputed = recomputeNets(rows);
+  await db.transaction(async (tx) => {
+    for (const r of recomputed) {
+      await tx
+        .update(receiptLines)
+        .set({ netCents: r.netCents, orphan: r.orphan })
+        .where(eq(receiptLines.id, r.id));
+    }
+  });
 }
 
 export async function editLineAction(
@@ -63,25 +91,20 @@ export async function editLineAction(
 
   try {
     await assertSession(linkId);
-    // Conservative: net_cents := gross_cents on any edit. If this
-    // line was a parent that had IRC attribution, the prior fold no
-    // longer matches; Story 2.4 will let the payer re-bind.
-    const result = await db
+    // Update the line's own fields; net_cents is NOT set here — it is
+    // re-derived by refoldSessionNets so editing a parent line's
+    // gross/qty re-folds (not wipes) any IRC attributed to it.
+    await db
       .update(receiptLines)
       .set({
         description,
         qty,
         grossCents: cents,
-        netCents: cents,
       })
       .where(
         and(eq(receiptLines.id, lineId), eq(receiptLines.sessionId, linkId)),
       );
-    // drizzle pg's update returns void by default; existence is
-    // already gated by assertSession + composite WHERE. A 0-row
-    // update silently no-ops, which is acceptable here (the row
-    // could have been deleted between page render and submit).
-    void result;
+    await refoldSessionNets(linkId);
   } catch (e) {
     if (e instanceof Error && e.message === FRIENDLY_NOT_FOUND) throw e;
     console.error(
@@ -109,6 +132,9 @@ export async function deleteLineAction(
       .where(
         and(eq(receiptLines.id, lineId), eq(receiptLines.sessionId, linkId)),
       );
+    // Deleting a parent orphans its IRC children — re-fold so their
+    // orphan flag + the conservation totals stay correct.
+    await refoldSessionNets(linkId);
   } catch (e) {
     if (e instanceof Error && e.message === FRIENDLY_NOT_FOUND) throw e;
     console.error(
@@ -196,8 +222,6 @@ export async function addLineAction(
 // "unused" lint by keeping a typed reference. (drizzle re-exports
 // `asc`/`desc` from the same module; we use `desc` above.)
 export const _internalAsc = asc;
-
-import { recomputeNets } from "@/features/reconciliation/recompute";
 
 /**
  * Story 2.4 — re-bind an IRC line to a new parent (or to orphan)
