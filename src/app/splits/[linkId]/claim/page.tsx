@@ -20,10 +20,12 @@ import { isValidLinkId } from "@/lib/linkId";
 
 interface Ctx {
   params: Promise<{ linkId: string }>;
+  searchParams: Promise<{ added?: string; removed?: string }>;
 }
 
-export default async function ClaimPage({ params }: Ctx) {
+export default async function ClaimPage({ params, searchParams }: Ctx) {
   const { linkId } = await params;
+  const { added, removed } = await searchParams;
   if (!isValidLinkId(linkId)) notFound();
 
   const exists = await sessionExists(linkId).catch(() => false);
@@ -50,6 +52,8 @@ export default async function ClaimPage({ params }: Ctx) {
       <ClaimPageBody
         linkId={linkId}
         existing={existing}
+        addedName={added ?? null}
+        removedName={removed ?? null}
         lines={lines.map((l) => ({
           id: l.id,
           lineNo: l.lineNo,

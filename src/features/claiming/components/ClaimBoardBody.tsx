@@ -20,7 +20,10 @@ import {
 } from "@/features/claiming/shareMath";
 import { ClaimRow } from "@/features/claiming/components/ClaimRow";
 import { undoLastClaimAction } from "@/features/claiming/server/actions";
-import { addPersonAction } from "@/features/identity/server/actions";
+import {
+  addPersonAction,
+  removePersonAction,
+} from "@/features/identity/server/actions";
 import { getOrCreateDeviceToken } from "@/features/identity/deviceToken";
 import { formatCents } from "@/features/reconciliation/lib/formatCents";
 
@@ -63,6 +66,9 @@ interface Props {
   /** Caller's own device-bound identity; null for an owner who has
    *  not picked/created their own identity yet. */
   myIdentityId: string | null;
+  /** Toast cues from the add/remove-person redirects. */
+  addedName: string | null;
+  removedName: string | null;
   lines: LineProp[];
   claims: ClaimProp[];
   unverified: boolean;
@@ -74,6 +80,8 @@ export function ClaimBoardBody({
   isOwner,
   allIdentities,
   myIdentityId,
+  addedName,
+  removedName,
   lines,
   claims,
   unverified,
@@ -112,6 +120,7 @@ export function ClaimBoardBody({
 
   const undoBound = undoLastClaimAction.bind(null, linkId);
   const addPersonBound = addPersonAction.bind(null, linkId);
+  const removePersonBound = removePersonAction.bind(null, linkId);
 
   const claimsByLine = new Map<string, ClaimProp[]>();
   for (const c of claims) {
@@ -126,27 +135,73 @@ export function ClaimBoardBody({
 
   return (
     <section className="flex flex-col gap-3">
+      {addedName ? (
+        <p
+          role="status"
+          className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100"
+        >
+          ✓ 已新增「{addedName}」
+        </p>
+      ) : null}
+      {removedName ? (
+        <p
+          role="status"
+          className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
+        >
+          已移除「{removedName}」
+        </p>
+      ) : null}
       {isOwner ? (
         <div className="rounded-md border border-primary/30 bg-primary/5 px-4 py-3 flex flex-col gap-3">
           <p className="text-xs text-muted-foreground">
             你是發起人 — 可以幫每個人勾選認領，之後分享連結讓他們確認或修改。
           </p>
           {!noPeopleYet ? (
-            <label className="flex items-center gap-2 text-sm">
-              <span className="shrink-0">目前幫</span>
-              <select
-                value={actingId}
-                onChange={(e) => setActingId(e.target.value)}
-                className="flex-1 rounded border border-input bg-background px-2 py-1.5 text-sm"
-              >
-                {allIdentities.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-              <span className="shrink-0">認領</span>
-            </label>
+            <>
+              <label className="flex items-center gap-2 text-sm">
+                <span className="shrink-0">目前幫</span>
+                <select
+                  value={actingId}
+                  onChange={(e) => setActingId(e.target.value)}
+                  className="flex-1 rounded border border-input bg-background px-2 py-1.5 text-sm"
+                >
+                  {allIdentities.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+                <span className="shrink-0">認領</span>
+              </label>
+              <details>
+                <summary className="cursor-pointer text-xs text-destructive">
+                  ▸ 移除「{actingName}」
+                </summary>
+                <form action={removePersonBound} className="mt-2">
+                  {token ? (
+                    <input
+                      type="hidden"
+                      name="deviceToken"
+                      value={token}
+                    />
+                  ) : null}
+                  <input
+                    type="hidden"
+                    name="targetIdentityId"
+                    value={actingId}
+                  />
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    會一併刪掉「{actingName}」的所有認領，無法復原。
+                  </p>
+                  <button
+                    type="submit"
+                    className="rounded bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground hover:opacity-90"
+                  >
+                    確認移除
+                  </button>
+                </form>
+              </details>
+            </>
           ) : null}
           <details>
             <summary className="cursor-pointer text-sm font-medium text-primary">

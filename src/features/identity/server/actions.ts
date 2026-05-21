@@ -115,7 +115,64 @@ export async function addPersonAction(
     );
     throw new Error(FRIENDLY_UNEXPECTED);
   }
-  redirect(`/splits/${linkId}/claim`);
+  // Redirect with ?added=<name> so the board can confirm the add —
+  // without the toast the payer can't tell it worked and re-adds.
+  redirect(`/splits/${linkId}/claim?added=${encodeURIComponent(name)}`);
+}
+
+/**
+ * Feature B — the session owner removes a person. Deletes the
+ * identity together with its claims + change-log rows (the owner has
+ * full control of the board; guarded by a confirm in the UI).
+ */
+export async function removePersonAction(
+  linkId: string,
+  formData: FormData,
+): Promise<void> {
+  if (!isValidLinkId(linkId)) throw new Error(FRIENDLY_NOT_FOUND);
+  const rawToken = String(formData.get("deviceToken") ?? "");
+  if (!isValidDeviceToken(rawToken)) throw new Error(FRIENDLY_INVALID);
+  const identityId = String(formData.get("targetIdentityId") ?? "").trim();
+  if (identityId.length === 0) throw new Error(FRIENDLY_INVALID);
+  let removedName = "";
+  try {
+    const sessionOk = await sessionExistsRepo(linkId);
+    if (!sessionOk) throw new Error(FRIENDLY_NOT_FOUND);
+    const owner = await isSessionOwner(linkId, rawToken);
+    if (!owner) throw new Error(FRIENDLY_OWNER_ONLY);
+    const target = (await listIdentities(linkId)).find(
+      (i) => i.id === identityId,
+    );
+    if (!target) throw new Error(FRIENDLY_NOT_FOUND);
+    removedName = target.name;
+    const { db } = await import("@/lib/db/client");
+    const { claims, claimChanges, identities } = await import("@/db/schema");
+    const { eq } = await import("drizzle-orm");
+    await db.transaction(async (tx) => {
+      await tx.delete(claims).where(eq(claims.identityId, identityId));
+      await tx
+        .delete(claimChanges)
+        .where(eq(claimChanges.identityId, identityId));
+      await tx.delete(identities).where(eq(identities.id, identityId));
+    });
+  } catch (e) {
+    if (
+      e instanceof Error &&
+      [FRIENDLY_INVALID, FRIENDLY_NOT_FOUND, FRIENDLY_OWNER_ONLY].includes(
+        e.message,
+      )
+    ) {
+      throw e;
+    }
+    console.error(
+      "[removePersonAction] failed:",
+      e instanceof Error ? e.message : String(e),
+    );
+    throw new Error(FRIENDLY_UNEXPECTED);
+  }
+  redirect(
+    `/splits/${linkId}/claim?removed=${encodeURIComponent(removedName)}`,
+  );
 }
 
 const FRIENDLY_INVALID = "輸入內容格式不正確，請確認後再試。";

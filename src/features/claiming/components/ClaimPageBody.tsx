@@ -48,6 +48,9 @@ interface Props {
   linkId: string;
   /** Server-rendered list — used by IdentityPicker for the "是不是你" path. */
   existing: Existing[];
+  /** Toast cues from add/remove-person redirects. */
+  addedName: string | null;
+  removedName: string | null;
   lines: LineForBoard[];
   claims: ClaimerForBoard[];
   unverified: boolean;
@@ -74,6 +77,8 @@ function reducer(_state: ResolveState, action: ResolveAction): ResolveState {
 export function ClaimPageBody({
   linkId,
   existing,
+  addedName,
+  removedName,
   lines,
   claims,
   unverified,
@@ -138,6 +143,8 @@ export function ClaimPageBody({
       isOwner={state.isOwner}
       allIdentities={existing}
       myIdentityId={state.id}
+      addedName={addedName}
+      removedName={removedName}
       lines={lines}
       claims={claims}
       unverified={unverified}
