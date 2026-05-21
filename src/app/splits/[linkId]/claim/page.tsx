@@ -38,11 +38,6 @@ export default async function ClaimPage({ params }: Ctx) {
   const lines =
     summary?.lines.filter((l) => l.claimable && !l.isIrc) ?? [];
   const existing = identitiesAll.map((i) => ({ id: i.id, name: i.name }));
-  const identitiesForResolve = identitiesAll.map((i) => ({
-    id: i.id,
-    name: i.name,
-    deviceTokenHash: i.deviceTokenHash,
-  }));
 
   return (
     <main className="min-h-dvh max-w-md mx-auto flex flex-col gap-4 px-4 py-6">
@@ -54,7 +49,6 @@ export default async function ClaimPage({ params }: Ctx) {
       </header>
       <ClaimPageBody
         linkId={linkId}
-        identities={identitiesForResolve}
         existing={existing}
         lines={lines.map((l) => ({
           id: l.id,

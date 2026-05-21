@@ -12,6 +12,7 @@ import { useEffect, useReducer, useSyncExternalStore } from "react";
 import { ClaimBoardBody } from "@/features/claiming/components/ClaimBoardBody";
 import { IdentityPicker } from "@/features/identity/components/IdentityPicker";
 import { getOrCreateDeviceToken } from "@/features/identity/deviceToken";
+import { resolveMyIdentityAction } from "@/features/identity/server/actions";
 
 function subscribeNoop(): () => void {
   return () => {};
@@ -21,14 +22,6 @@ function getServerSnap(): string | null {
 }
 function getTokenSnap(): string | null {
   return getOrCreateDeviceToken();
-}
-
-async function hashHex(s: string): Promise<string> {
-  const enc = new TextEncoder().encode(s);
-  const digest = await crypto.subtle.digest("SHA-256", enc);
-  return [...new Uint8Array(digest)]
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
 }
 
 interface ClaimerForBoard {
@@ -45,12 +38,6 @@ interface LineForBoard {
   netCents: number;
 }
 
-interface IdentityForResolve {
-  id: string;
-  name: string;
-  deviceTokenHash: string;
-}
-
 interface Existing {
   id: string;
   name: string;
@@ -58,7 +45,7 @@ interface Existing {
 
 interface Props {
   linkId: string;
-  identities: IdentityForResolve[];
+  /** Server-rendered list — used by IdentityPicker for the "是不是你" path. */
   existing: Existing[];
   lines: LineForBoard[];
   claims: ClaimerForBoard[];
@@ -87,7 +74,6 @@ function reducer(_state: ResolveState, action: ResolveAction): ResolveState {
 
 export function ClaimPageBody({
   linkId,
-  identities,
   existing,
   lines,
   claims,
@@ -111,19 +97,32 @@ export function ClaimPageBody({
     }
     let cancelled = false;
     (async () => {
-      const hash = await hashHex(token);
-      if (cancelled) return;
-      const match = identities.find((i) => i.deviceTokenHash === hash);
-      if (match) {
-        dispatch({ type: "match", id: match.id, name: match.name });
-      } else {
+      try {
+        // Resolve via a server action — node's `createHash` works in
+        // any context, unlike `crypto.subtle` which iOS Safari hides on
+        // plain-HTTP origins (LAN dev). The raw token only crosses the
+        // wire here as it already does for create/pick; the server
+        // hashes and never persists raw.
+        const match = await resolveMyIdentityAction(linkId, token);
+        if (cancelled) return;
+        if (match) {
+          dispatch({ type: "match", id: match.id, name: match.name });
+        } else {
+          dispatch({ type: "noMatch" });
+        }
+      } catch (e) {
+        if (cancelled) return;
+        console.error(
+          "[ClaimPageBody] identity resolve failed:",
+          e instanceof Error ? e.message : String(e),
+        );
         dispatch({ type: "noMatch" });
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [token, identities]);
+  }, [linkId, token]);
 
   if (state.status === "pending") {
     return <p className="text-sm text-muted-foreground">正在確認你的身份…</p>;

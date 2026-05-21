@@ -24,6 +24,31 @@ import {
 } from "@/features/identity/server/identityRepo";
 import { isValidLinkId } from "@/lib/linkId";
 
+/**
+ * Resolve "who am I on this session" given the caller's raw device
+ * token. Pure read; never mutates. Used by ClaimPageBody from the
+ * client — keeping the hashing on the server side avoids the
+ * `crypto.subtle` secure-context requirement that breaks identity
+ * resolution over plain HTTP on iOS Safari (LAN dev).
+ */
+export async function resolveMyIdentityAction(
+  linkId: string,
+  rawToken: string,
+): Promise<{ id: string; name: string } | null> {
+  if (!isValidLinkId(linkId)) return null;
+  if (!isValidDeviceToken(rawToken)) return null;
+  try {
+    const match = await findIdentityForToken(linkId, rawToken);
+    return match ? { id: match.id, name: match.name } : null;
+  } catch (e) {
+    console.error(
+      "[resolveMyIdentityAction] failed:",
+      e instanceof Error ? e.message : String(e),
+    );
+    return null;
+  }
+}
+
 const FRIENDLY_INVALID = "輸入內容格式不正確，請確認後再試。";
 const FRIENDLY_NOT_FOUND = "找不到這個分帳，請重新整理。";
 const FRIENDLY_UNEXPECTED = "暫時無法儲存身份，請稍後再試。";
