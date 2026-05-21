@@ -29,6 +29,9 @@ interface Props {
   lineNo: number;
   description: string;
   netCents: number;
+  /** Share count — when > 1 the row shows the per-share unit price
+   *  and the weight input means "how many shares you took". */
+  qty: number;
   claimers: Claimer[];
   myIdentityId: string;
   currency: string | null;
@@ -50,10 +53,15 @@ export function ClaimRow({
   lineNo,
   description,
   netCents,
+  qty,
   claimers,
   myIdentityId,
   currency,
 }: Props) {
+  const multiShare = qty > 1;
+  // Per-share unit price, rounded for display only — the settlement
+  // math stays exact via largest-remainder in shareMath.
+  const unitCents = multiShare ? Math.round(netCents / qty) : netCents;
   const token = useSyncExternalStore(
     subscribeNoop,
     getTokenSnapshot,
@@ -89,6 +97,11 @@ export function ClaimRow({
       </form>
       <span className="flex-1 min-w-0">
         <span className="block text-sm font-medium">{description}</span>
+        {multiShare ? (
+          <span className="block text-xs text-muted-foreground">
+            共 {qty} 份 · 每份 {formatCents(unitCents, { currency })}
+          </span>
+        ) : null}
         {claimers.length > 0 ? (
           <span className="block text-xs text-muted-foreground truncate">
             {claimers
@@ -108,8 +121,11 @@ export function ClaimRow({
           {token ? (
             <input type="hidden" name="deviceToken" value={token} />
           ) : null}
-          <label className="sr-only" htmlFor={`w-${lineId}`}>
-            我的份額
+          <label
+            className={multiShare ? "text-xs text-muted-foreground" : "sr-only"}
+            htmlFor={`w-${lineId}`}
+          >
+            {multiShare ? "拿幾份" : "我的份額"}
           </label>
           <input
             id={`w-${lineId}`}
@@ -126,7 +142,7 @@ export function ClaimRow({
             disabled={!token}
             className="text-xs text-primary underline underline-offset-2 hover:no-underline disabled:opacity-50"
           >
-            更新份額
+            更新
           </button>
         </form>
       ) : null}

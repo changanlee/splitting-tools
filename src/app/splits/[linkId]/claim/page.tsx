@@ -55,6 +55,7 @@ export default async function ClaimPage({ params }: Ctx) {
           lineNo: l.lineNo,
           description: l.description,
           netCents: l.netCents,
+          qty: l.qty,
         }))}
         claims={claimsAll.map((c) => ({
           receiptLineId: c.receiptLineId,

@@ -7,82 +7,75 @@ import {
   type LineForShare,
 } from "@/features/claiming/shareMath";
 
-describe("computeSubtotals — largest-remainder integer-cents", () => {
+describe("computeSubtotals — qty=1 single-share lines (relative split)", () => {
   it("single claimer takes the whole net", () => {
-    const lines: LineForShare[] = [{ id: "L1", netCents: 9990 }];
+    const lines: LineForShare[] = [{ id: "L1", netCents: 9990, qty: 1 }];
     const claims: ClaimForShare[] = [
       { receiptLineId: "L1", identityId: "A", weight: 1 },
     ];
-    const s = computeSubtotals(lines, claims);
-    expect(s.get("A")).toBe(9990);
-    expect(sumSubtotals(s)).toBe(9990);
+    const r = computeSubtotals(lines, claims);
+    expect(r.byIdentity.get("A")).toBe(9990);
+    expect(r.pendingFromUnderclaim).toBe(0);
+    expect(sumSubtotals(r.byIdentity)).toBe(9990);
   });
 
-  it("single claimer takes the whole net even with weight>1", () => {
-    // Weight is relative-among-claimers — a sole claimer always pays
-    // the full line regardless of the weight they entered.
-    const lines: LineForShare[] = [{ id: "L1", netCents: 9990 }];
-    const claims: ClaimForShare[] = [
-      { receiptLineId: "L1", identityId: "A", weight: 3 },
-    ];
-    const s = computeSubtotals(lines, claims);
-    expect(s.get("A")).toBe(9990);
-  });
-
-  it("two even claimers split equally; remainder distributed by stable id order", () => {
-    const lines: LineForShare[] = [{ id: "L1", netCents: 9990 }];
+  it("two even claimers split equally; remainder by stable id order", () => {
+    const lines: LineForShare[] = [{ id: "L1", netCents: 9990, qty: 1 }];
     const claims: ClaimForShare[] = [
       { receiptLineId: "L1", identityId: "B", weight: 1 },
       { receiptLineId: "L1", identityId: "A", weight: 1 },
     ];
-    const s = computeSubtotals(lines, claims);
-    expect(s.get("A")).toBe(4995);
-    expect(s.get("B")).toBe(4995);
-    expect(sumSubtotals(s)).toBe(9990);
+    const r = computeSubtotals(lines, claims);
+    expect(r.byIdentity.get("A")).toBe(4995);
+    expect(r.byIdentity.get("B")).toBe(4995);
+    expect(r.pendingFromUnderclaim).toBe(0);
   });
 
-  it("odd cent leftover routes to the lexicographically-first id (deterministic)", () => {
-    const lines: LineForShare[] = [{ id: "L1", netCents: 9991 }];
+  it("odd cent leftover routes to the lexicographically-first id", () => {
+    const lines: LineForShare[] = [{ id: "L1", netCents: 9991, qty: 1 }];
     const claims: ClaimForShare[] = [
       { receiptLineId: "L1", identityId: "B", weight: 1 },
       { receiptLineId: "L1", identityId: "A", weight: 1 },
     ];
-    const s = computeSubtotals(lines, claims);
-    expect(sumSubtotals(s)).toBe(9991);
-    expect(s.get("A")).toBeGreaterThanOrEqual(s.get("B") ?? 0);
+    const r = computeSubtotals(lines, claims);
+    expect(sumSubtotals(r.byIdentity)).toBe(9991);
+    expect(r.byIdentity.get("A") ?? 0).toBeGreaterThanOrEqual(
+      r.byIdentity.get("B") ?? 0,
+    );
   });
 
-  it("weighted 2:1 → exact-on-base case", () => {
-    const lines: LineForShare[] = [{ id: "L1", netCents: 3000 }];
+  it("weighted 2:1 ratio on a qty=1 line", () => {
+    const lines: LineForShare[] = [{ id: "L1", netCents: 3000, qty: 1 }];
     const claims: ClaimForShare[] = [
       { receiptLineId: "L1", identityId: "A", weight: 2 },
       { receiptLineId: "L1", identityId: "B", weight: 1 },
     ];
-    const s = computeSubtotals(lines, claims);
-    expect(s.get("A")).toBe(2000);
-    expect(s.get("B")).toBe(1000);
-    expect(sumSubtotals(s)).toBe(3000);
+    const r = computeSubtotals(lines, claims);
+    expect(r.byIdentity.get("A")).toBe(2000);
+    expect(r.byIdentity.get("B")).toBe(1000);
+    expect(r.pendingFromUnderclaim).toBe(0);
   });
 
   it("unclaimed line contributes nothing to anyone", () => {
     const lines: LineForShare[] = [
-      { id: "L1", netCents: 1000 },
-      { id: "L2", netCents: 500 },
+      { id: "L1", netCents: 1000, qty: 1 },
+      { id: "L2", netCents: 500, qty: 1 },
     ];
     const claims: ClaimForShare[] = [
       { receiptLineId: "L1", identityId: "A", weight: 1 },
     ];
-    const s = computeSubtotals(lines, claims);
-    expect(s.get("A")).toBe(1000);
-    expect(s.get("B")).toBeUndefined();
-    expect(sumSubtotals(s)).toBe(1000); // L2 NOT in any subtotal (pending)
+    const r = computeSubtotals(lines, claims);
+    expect(r.byIdentity.get("A")).toBe(1000);
+    expect(r.byIdentity.get("B")).toBeUndefined();
+    expect(sumSubtotals(r.byIdentity)).toBe(1000);
+    expect(r.pendingFromUnderclaim).toBe(0);
   });
 
-  it("multiple lines accumulate per identity; conservation across all claimed lines", () => {
+  it("multiple lines accumulate per identity; conservation holds", () => {
     const lines: LineForShare[] = [
-      { id: "L1", netCents: 1000 },
-      { id: "L2", netCents: 2000 },
-      { id: "L3", netCents: 3000 },
+      { id: "L1", netCents: 1000, qty: 1 },
+      { id: "L2", netCents: 2000, qty: 1 },
+      { id: "L3", netCents: 3000, qty: 1 },
     ];
     const claims: ClaimForShare[] = [
       { receiptLineId: "L1", identityId: "A", weight: 1 },
@@ -90,9 +83,80 @@ describe("computeSubtotals — largest-remainder integer-cents", () => {
       { receiptLineId: "L2", identityId: "B", weight: 1 },
       { receiptLineId: "L3", identityId: "B", weight: 1 },
     ];
-    const s = computeSubtotals(lines, claims);
-    expect(s.get("A")).toBe(1000 + 1000);
-    expect(s.get("B")).toBe(1000 + 3000);
-    expect(sumSubtotals(s)).toBe(1000 + 2000 + 3000);
+    const r = computeSubtotals(lines, claims);
+    expect(r.byIdentity.get("A")).toBe(1000 + 1000);
+    expect(r.byIdentity.get("B")).toBe(1000 + 3000);
+    expect(sumSubtotals(r.byIdentity)).toBe(6000);
+  });
+});
+
+describe("computeSubtotals — multi-share lines (qty > 1)", () => {
+  it("4-pack ¥99.90, single claimer takes 2 shares → ¥49.95, pending ¥49.95", () => {
+    const lines: LineForShare[] = [{ id: "L1", netCents: 9990, qty: 4 }];
+    const claims: ClaimForShare[] = [
+      { receiptLineId: "L1", identityId: "A", weight: 2 },
+    ];
+    const r = computeSubtotals(lines, claims);
+    expect(r.byIdentity.get("A")).toBe(4995);
+    expect(r.pendingFromUnderclaim).toBe(4995);
+    expect(sumSubtotals(r.byIdentity) + r.pendingFromUnderclaim).toBe(9990);
+  });
+
+  it("4-pack ¥99.90, claimer takes all 4 shares → ¥99.90, pending 0", () => {
+    const lines: LineForShare[] = [{ id: "L1", netCents: 9990, qty: 4 }];
+    const claims: ClaimForShare[] = [
+      { receiptLineId: "L1", identityId: "A", weight: 4 },
+    ];
+    const r = computeSubtotals(lines, claims);
+    expect(r.byIdentity.get("A")).toBe(9990);
+    expect(r.pendingFromUnderclaim).toBe(0);
+  });
+
+  it("4-pack, A takes 2 + B takes 2 → ¥49.95 each, pending 0", () => {
+    const lines: LineForShare[] = [{ id: "L1", netCents: 9990, qty: 4 }];
+    const claims: ClaimForShare[] = [
+      { receiptLineId: "L1", identityId: "A", weight: 2 },
+      { receiptLineId: "L1", identityId: "B", weight: 2 },
+    ];
+    const r = computeSubtotals(lines, claims);
+    expect(r.byIdentity.get("A")).toBe(4995);
+    expect(r.byIdentity.get("B")).toBe(4995);
+    expect(r.pendingFromUnderclaim).toBe(0);
+  });
+
+  it("4-pack, A takes 1 + B takes 1 → claimer pool ¥49.95, pending ¥49.95", () => {
+    const lines: LineForShare[] = [{ id: "L1", netCents: 9990, qty: 4 }];
+    const claims: ClaimForShare[] = [
+      { receiptLineId: "L1", identityId: "A", weight: 1 },
+      { receiptLineId: "L1", identityId: "B", weight: 1 },
+    ];
+    const r = computeSubtotals(lines, claims);
+    expect((r.byIdentity.get("A") ?? 0) + (r.byIdentity.get("B") ?? 0)).toBe(
+      4995,
+    );
+    expect(r.pendingFromUnderclaim).toBe(4995);
+    expect(sumSubtotals(r.byIdentity) + r.pendingFromUnderclaim).toBe(9990);
+  });
+
+  it("over-claim (Σweights > qty) collapses to relative split, no pending", () => {
+    const lines: LineForShare[] = [{ id: "L1", netCents: 9990, qty: 4 }];
+    const claims: ClaimForShare[] = [
+      { receiptLineId: "L1", identityId: "A", weight: 3 },
+      { receiptLineId: "L1", identityId: "B", weight: 3 },
+    ];
+    const r = computeSubtotals(lines, claims);
+    expect(r.byIdentity.get("A")).toBe(4995);
+    expect(r.byIdentity.get("B")).toBe(4995);
+    expect(r.pendingFromUnderclaim).toBe(0);
+  });
+
+  it("2-pack ¥16.50, claimer takes both shares → full ¥16.50, no pending", () => {
+    const lines: LineForShare[] = [{ id: "L1", netCents: 1650, qty: 2 }];
+    const claims: ClaimForShare[] = [
+      { receiptLineId: "L1", identityId: "A", weight: 2 },
+    ];
+    const r = computeSubtotals(lines, claims);
+    expect(r.byIdentity.get("A")).toBe(1650);
+    expect(r.pendingFromUnderclaim).toBe(0);
   });
 });

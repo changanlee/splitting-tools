@@ -1,21 +1,24 @@
 /**
  * Story 4.4/4.5 — pure per-identity share calculation.
  *
- * Given a list of claims `{ receiptLineId, identityId, weight }` plus
- * each claimable line's `netCents`, compute every identity's subtotal
- * in INTEGER CENTS using the largest-remainder method to preserve
- * `Σ subtotal == Σ net (claimed)`.
+ * Weight model (confirmed 2026-05-21 with the user):
+ *   - Every claimable line has a `qty` = how many SHARES it splits
+ *     into. OCR seeds it; the payer can override it on the review page
+ *     (e.g. a 4-pack 汽水 that scanned as qty=1 → set qty=4). The line's
+ *     unit price is therefore `netCents / qty`.
+ *   - Each claim carries a `weight` = how many shares that person took.
+ *   - A claimer's subtotal for a line = `netCents × weight / denom`
+ *     where `denom = max(qty, Σweights)`.
+ *       · Σweights < qty  → the line is under-claimed; the unclaimed
+ *         `qty − Σweights` shares spill into `pendingFromUnderclaim`
+ *         (the payer absorbs them).
+ *       · Σweights ≥ qty  → fully (or over-) claimed; `denom = Σweights`
+ *         and the whole line is distributed by relative weight — the
+ *         common single-item (qty=1) case collapses to exactly the
+ *         old relative-share behaviour.
  *
- * Weight model: **relative share among claimers of a line**. A line is
- * always distributed in FULL across whoever claims it — weight only
- * sets the ratio when 2+ people split the same line (e.g. weights 2:1
- * → ⅔ / ⅓). A sole claimer pays the whole line regardless of weight.
- * "I took only part of a multi-pack" is expressed by the payer
- * splitting the line on the review page, not by the share math.
- *
- * This is the deterministic precursor to Story 5.1's full settlement,
- * kept self-contained so the claim board can show "我應付 ¥X" without
- * re-running the settlement engine on every read.
+ * Conservation: `Σ subtotal + pendingFromUnderclaim == Σ netCents`
+ * over the claimed lines — integer cents, largest-remainder rounding.
  */
 
 export interface LineForShare {
@@ -23,28 +26,37 @@ export interface LineForShare {
   id: string;
   /** Integer cents — the net (post-IRC) amount of this line. */
   netCents: number;
+  /** Share count the line splits into (receipt_lines.qty, ≥ 1). */
+  qty: number;
 }
 
 export interface ClaimForShare {
   receiptLineId: string;
   identityId: string;
-  weight: number; // ≥ 1
+  weight: number; // ≥ 1 — shares this person took
 }
 
 /** identityId → integer cents */
 export type SubtotalsByIdentity = Map<string, number>;
 
+export interface SubtotalsResult {
+  byIdentity: SubtotalsByIdentity;
+  /** Cents from claimed-but-under-claimed lines (Σweights < qty) —
+   *  the payer absorbs these into the settlement's `pendingCents`. */
+  pendingFromUnderclaim: number;
+}
+
 /**
  * Distribute each line's `netCents` across its claimers by weight,
- * with largest-remainder rounding so the sum is exact. A line with
- * no claimers contributes 0 to anyone's subtotal (it's `pending` —
- * settle.ts surfaces those to the payer).
+ * with largest-remainder rounding so the sum is exact. A line with no
+ * claimers contributes 0 here (settle.ts surfaces it as fully pending).
  */
 export function computeSubtotals(
   lines: LineForShare[],
   allClaims: ClaimForShare[],
-): SubtotalsByIdentity {
-  const subtotals = new Map<string, number>();
+): SubtotalsResult {
+  const byIdentity: SubtotalsByIdentity = new Map();
+  let pendingFromUnderclaim = 0;
 
   // Group claims by line for O(1) lookup.
   const claimsByLine = new Map<string, ClaimForShare[]>();
@@ -60,25 +72,31 @@ export function computeSubtotals(
     const totalWeight = lineClaims.reduce((a, c) => a + c.weight, 0);
     if (totalWeight <= 0) continue;
 
-    // First pass: floor allocation per claimer; track fractional
-    // remainders for the largest-remainder tiebreak.
+    // denom ≥ totalWeight always; when qty exceeds it the surplus
+    // shares are unclaimed and their cents go to pending.
+    const denom = Math.max(line.qty, totalWeight);
+    const claimerPool = Math.trunc((line.netCents * totalWeight) / denom);
+    pendingFromUnderclaim += line.netCents - claimerPool;
+    if (claimerPool === 0) continue;
+
+    // Floor allocation per claimer over `claimerPool`; track the
+    // fractional remainder for the largest-remainder tiebreak.
     const allocations: {
       identityId: string;
       floor: number;
       remainder: number;
     }[] = lineClaims.map((c) => {
-      const product = line.netCents * c.weight;
+      const product = claimerPool * c.weight;
       const floor = Math.trunc(product / totalWeight);
       const remainder =
         ((product % totalWeight) + totalWeight) % totalWeight;
       return { identityId: c.identityId, floor, remainder };
     });
 
-    // Distribute the leftover cents (line.netCents - Σ floor) to
-    // claimers with the largest remainder; ties broken by identityId
-    // (lexicographic) for stable output across calls.
+    // Distribute the leftover cents (claimerPool − Σ floor) to the
+    // largest remainders; ties broken by identityId for determinism.
     const sumOfFloors = allocations.reduce((a, x) => a + x.floor, 0);
-    let leftover = line.netCents - sumOfFloors;
+    let leftover = claimerPool - sumOfFloors;
     const ordered = [...allocations].sort((a, b) => {
       if (b.remainder !== a.remainder) return b.remainder - a.remainder;
       return a.identityId < b.identityId
@@ -97,17 +115,17 @@ export function computeSubtotals(
 
     for (const a of allocations) {
       const delta = a.floor + (bumped.get(a.identityId) ?? 0);
-      subtotals.set(
+      byIdentity.set(
         a.identityId,
-        (subtotals.get(a.identityId) ?? 0) + delta,
+        (byIdentity.get(a.identityId) ?? 0) + delta,
       );
     }
   }
 
-  return subtotals;
+  return { byIdentity, pendingFromUnderclaim };
 }
 
-/** Conservation helper — Σ subtotal for the claimed lines. */
+/** Conservation helper — Σ subtotal across all identities. */
 export function sumSubtotals(s: SubtotalsByIdentity): number {
   let total = 0;
   for (const v of s.values()) total += v;

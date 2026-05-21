@@ -65,6 +65,7 @@ describe("regression invariants (#5564)", () => {
       {
         id: "placeholder-line",
         netCents: RECEIPT_5564.expectedParsedSumCents,
+        qty: 1,
         isIrc: false,
         claimable: true,
         orphan: false,

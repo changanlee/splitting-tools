@@ -4,7 +4,7 @@
  * placeholder). Payer name is Epic 4 territory; for v1 the message
  * card shows "付款人" as a placeholder.
  */
-import { count, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db/client";
 import { receiptLines, sessions } from "@/db/schema";
@@ -35,9 +35,13 @@ export async function getShareSummary(
     .limit(1);
   if (!sess[0]) return null;
 
+  // `lineCount` counts real product lines only — IRC discount rows
+  // are not "品項" and would inflate the share-card count (a 25-item
+  // receipt with 3 IRCs would read "28 行"). `grossSum` (parsed_sum)
+  // still sums ALL rows incl. the IRC negatives so it equals 220850.
   const agg = await db
     .select({
-      lineCount: count(),
+      lineCount: sql<number>`COUNT(*) FILTER (WHERE ${receiptLines.isIrc} = false)`,
       grossSum: sql<number>`COALESCE(SUM(${receiptLines.grossCents}), 0)`,
     })
     .from(receiptLines)
