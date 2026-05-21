@@ -22,6 +22,7 @@ import { ClaimRow } from "@/features/claiming/components/ClaimRow";
 import { undoLastClaimAction } from "@/features/claiming/server/actions";
 import {
   addPersonAction,
+  pickOrCreateIdentityAction,
   removePersonAction,
 } from "@/features/identity/server/actions";
 import { getOrCreateDeviceToken } from "@/features/identity/deviceToken";
@@ -121,6 +122,7 @@ export function ClaimBoardBody({
   const undoBound = undoLastClaimAction.bind(null, linkId);
   const addPersonBound = addPersonAction.bind(null, linkId);
   const removePersonBound = removePersonAction.bind(null, linkId);
+  const joinAsOwnerBound = pickOrCreateIdentityAction.bind(null, linkId);
 
   const claimsByLine = new Map<string, ClaimProp[]>();
   for (const c of claims) {
@@ -156,53 +158,103 @@ export function ClaimBoardBody({
           <p className="text-xs text-muted-foreground">
             你是發起人 — 可以幫每個人勾選認領，之後分享連結讓他們確認或修改。
           </p>
-          {!noPeopleYet ? (
-            <>
-              <label className="flex items-center gap-2 text-sm">
-                <span className="shrink-0">目前幫</span>
-                <select
-                  value={actingId}
-                  onChange={(e) => setActingId(e.target.value)}
-                  className="flex-1 rounded border border-input bg-background px-2 py-1.5 text-sm"
-                >
-                  {allIdentities.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-                <span className="shrink-0">認領</span>
+
+          {/* The owner is not yet a participant — ask their name once
+              so they can also be claimed for (auto-join, Q1). */}
+          {!myIdentityId ? (
+            <form
+              action={joinAsOwnerBound}
+              className="flex items-end gap-2 rounded border border-primary/40 bg-background p-2"
+            >
+              {token ? (
+                <input type="hidden" name="deviceToken" value={token} />
+              ) : null}
+              <input type="hidden" name="mode" value="create" />
+              <label className="flex flex-1 flex-col gap-1">
+                <span className="text-xs font-medium text-primary">
+                  先輸入你的名字（你自己也要分帳）
+                </span>
+                <input
+                  name="name"
+                  maxLength={30}
+                  required
+                  placeholder="例：我"
+                  className="rounded border border-input bg-background px-2 py-1.5 text-sm"
+                />
               </label>
-              <details>
-                <summary className="cursor-pointer text-xs text-destructive">
-                  ▸ 移除「{actingName}」
-                </summary>
-                <form action={removePersonBound} className="mt-2">
-                  {token ? (
-                    <input
-                      type="hidden"
-                      name="deviceToken"
-                      value={token}
-                    />
-                  ) : null}
-                  <input
-                    type="hidden"
-                    name="targetIdentityId"
-                    value={actingId}
-                  />
-                  <p className="mb-2 text-xs text-muted-foreground">
-                    會一併刪掉「{actingName}」的所有認領，無法復原。
-                  </p>
-                  <button
-                    type="submit"
-                    className="rounded bg-destructive px-3 py-1.5 text-xs font-medium text-destructive-foreground hover:opacity-90"
-                  >
-                    確認移除
-                  </button>
-                </form>
-              </details>
-            </>
+              <button
+                type="submit"
+                className="rounded bg-primary text-primary-foreground px-3 py-1.5 text-sm font-medium hover:opacity-90"
+              >
+                加入
+              </button>
+            </form>
           ) : null}
+
+          {!noPeopleYet ? (
+            <label className="flex items-center gap-2 text-sm">
+              <span className="shrink-0">目前幫</span>
+              <select
+                value={actingId}
+                onChange={(e) => setActingId(e.target.value)}
+                className="flex-1 rounded border border-input bg-background px-2 py-1.5 text-sm"
+              >
+                {allIdentities.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                    {p.id === myIdentityId ? "（你）" : ""}
+                  </option>
+                ))}
+              </select>
+              <span className="shrink-0">認領</span>
+            </label>
+          ) : null}
+
+          {/* People overview + per-person delete (Q2 #2). */}
+          {allIdentities.length > 0 ? (
+            <details>
+              <summary className="cursor-pointer text-sm font-medium text-primary">
+                ▸ 管理分攤人員（{allIdentities.length}）
+              </summary>
+              <ul className="mt-2 flex flex-col divide-y divide-border">
+                {allIdentities.map((p) => (
+                  <li
+                    key={p.id}
+                    className="flex items-center justify-between py-2 text-sm"
+                  >
+                    <span>
+                      {p.name}
+                      {p.id === myIdentityId ? "（你）" : ""}
+                    </span>
+                    <form action={removePersonBound}>
+                      {token ? (
+                        <input
+                          type="hidden"
+                          name="deviceToken"
+                          value={token}
+                        />
+                      ) : null}
+                      <input
+                        type="hidden"
+                        name="targetIdentityId"
+                        value={p.id}
+                      />
+                      <button
+                        type="submit"
+                        className="text-xs text-destructive underline underline-offset-2 hover:no-underline"
+                      >
+                        移除
+                      </button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-1 text-xs text-muted-foreground">
+                移除會一併刪掉那個人的所有認領，無法復原。
+              </p>
+            </details>
+          ) : null}
+
           <details>
             <summary className="cursor-pointer text-sm font-medium text-primary">
               ＋ 新增一個人
@@ -259,7 +311,7 @@ export function ClaimBoardBody({
 
       {noPeopleYet ? (
         <p className="px-1 py-4 text-sm text-muted-foreground">
-          先用上面「＋ 新增一個人」加入要分帳的人，就能開始勾選認領。
+          先在上面輸入你的名字、或「＋ 新增一個人」，就能開始勾選認領。
         </p>
       ) : (
         <ol className="rounded-md border border-border overflow-hidden">
