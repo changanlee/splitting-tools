@@ -62,6 +62,10 @@ export async function persistReceiptLines(
       description: l.description,
       rawText: l.rawText ?? null,
       qty: l.qty,
+      // Seed shareCount from the receipt qty — a "3x milk" line splits
+      // 3 ways by default; single items split 1 way (whole line). The
+      // payer overrides this on review for multipack SKUs.
+      shareCount: Math.max(1, l.qty),
       grossCents: l.grossCents,
       netCents: l.netCents,
       isIrc: l.isIrc,

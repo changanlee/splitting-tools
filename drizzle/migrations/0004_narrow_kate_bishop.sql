@@ -1,0 +1,1 @@
+ALTER TABLE "receipt_lines" ADD COLUMN "share_count" integer DEFAULT 1 NOT NULL;

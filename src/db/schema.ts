@@ -139,7 +139,14 @@ export const receiptLines = pgTable(
     lineNo: integer("line_no").notNull(),
     description: text("description").notNull(),
     rawText: text("raw_text"),
+    // Receipt-printed quantity (OCR truth, for reconciliation). NOT a
+    // splitting concept — see `shareCount`.
     qty: integer("qty").notNull(),
+    // How many shares this line splits into for claiming. Seeded from
+    // `qty` at parse time; the payer overrides it on review (e.g. a
+    // 4-pack 汽水 rung up as qty=1 → shareCount=4). The claim weight
+    // math divides by this, never by `qty`.
+    shareCount: integer("share_count").notNull().default(1),
     // Original line amount; IRC discount lines are negative.
     grossCents: integer("gross_cents").notNull(),
     // Parent = gross + Σ(its IRC); normal = gross; IRC = own amount.

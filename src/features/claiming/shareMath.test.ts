@@ -9,7 +9,7 @@ import {
 
 describe("computeSubtotals — qty=1 single-share lines (relative split)", () => {
   it("single claimer takes the whole net", () => {
-    const lines: LineForShare[] = [{ id: "L1", netCents: 9990, qty: 1 }];
+    const lines: LineForShare[] = [{ id: "L1", netCents: 9990, shareCount: 1 }];
     const claims: ClaimForShare[] = [
       { receiptLineId: "L1", identityId: "A", weight: 1 },
     ];
@@ -20,7 +20,7 @@ describe("computeSubtotals — qty=1 single-share lines (relative split)", () =>
   });
 
   it("two even claimers split equally; remainder by stable id order", () => {
-    const lines: LineForShare[] = [{ id: "L1", netCents: 9990, qty: 1 }];
+    const lines: LineForShare[] = [{ id: "L1", netCents: 9990, shareCount: 1 }];
     const claims: ClaimForShare[] = [
       { receiptLineId: "L1", identityId: "B", weight: 1 },
       { receiptLineId: "L1", identityId: "A", weight: 1 },
@@ -32,7 +32,7 @@ describe("computeSubtotals — qty=1 single-share lines (relative split)", () =>
   });
 
   it("odd cent leftover routes to the lexicographically-first id", () => {
-    const lines: LineForShare[] = [{ id: "L1", netCents: 9991, qty: 1 }];
+    const lines: LineForShare[] = [{ id: "L1", netCents: 9991, shareCount: 1 }];
     const claims: ClaimForShare[] = [
       { receiptLineId: "L1", identityId: "B", weight: 1 },
       { receiptLineId: "L1", identityId: "A", weight: 1 },
@@ -45,7 +45,7 @@ describe("computeSubtotals — qty=1 single-share lines (relative split)", () =>
   });
 
   it("weighted 2:1 ratio on a qty=1 line", () => {
-    const lines: LineForShare[] = [{ id: "L1", netCents: 3000, qty: 1 }];
+    const lines: LineForShare[] = [{ id: "L1", netCents: 3000, shareCount: 1 }];
     const claims: ClaimForShare[] = [
       { receiptLineId: "L1", identityId: "A", weight: 2 },
       { receiptLineId: "L1", identityId: "B", weight: 1 },
@@ -58,8 +58,8 @@ describe("computeSubtotals — qty=1 single-share lines (relative split)", () =>
 
   it("unclaimed line contributes nothing to anyone", () => {
     const lines: LineForShare[] = [
-      { id: "L1", netCents: 1000, qty: 1 },
-      { id: "L2", netCents: 500, qty: 1 },
+      { id: "L1", netCents: 1000, shareCount: 1 },
+      { id: "L2", netCents: 500, shareCount: 1 },
     ];
     const claims: ClaimForShare[] = [
       { receiptLineId: "L1", identityId: "A", weight: 1 },
@@ -73,9 +73,9 @@ describe("computeSubtotals — qty=1 single-share lines (relative split)", () =>
 
   it("multiple lines accumulate per identity; conservation holds", () => {
     const lines: LineForShare[] = [
-      { id: "L1", netCents: 1000, qty: 1 },
-      { id: "L2", netCents: 2000, qty: 1 },
-      { id: "L3", netCents: 3000, qty: 1 },
+      { id: "L1", netCents: 1000, shareCount: 1 },
+      { id: "L2", netCents: 2000, shareCount: 1 },
+      { id: "L3", netCents: 3000, shareCount: 1 },
     ];
     const claims: ClaimForShare[] = [
       { receiptLineId: "L1", identityId: "A", weight: 1 },
@@ -92,7 +92,7 @@ describe("computeSubtotals — qty=1 single-share lines (relative split)", () =>
 
 describe("computeSubtotals — multi-share lines (qty > 1)", () => {
   it("4-pack ¥99.90, single claimer takes 2 shares → ¥49.95, pending ¥49.95", () => {
-    const lines: LineForShare[] = [{ id: "L1", netCents: 9990, qty: 4 }];
+    const lines: LineForShare[] = [{ id: "L1", netCents: 9990, shareCount: 4 }];
     const claims: ClaimForShare[] = [
       { receiptLineId: "L1", identityId: "A", weight: 2 },
     ];
@@ -103,7 +103,7 @@ describe("computeSubtotals — multi-share lines (qty > 1)", () => {
   });
 
   it("4-pack ¥99.90, claimer takes all 4 shares → ¥99.90, pending 0", () => {
-    const lines: LineForShare[] = [{ id: "L1", netCents: 9990, qty: 4 }];
+    const lines: LineForShare[] = [{ id: "L1", netCents: 9990, shareCount: 4 }];
     const claims: ClaimForShare[] = [
       { receiptLineId: "L1", identityId: "A", weight: 4 },
     ];
@@ -113,7 +113,7 @@ describe("computeSubtotals — multi-share lines (qty > 1)", () => {
   });
 
   it("4-pack, A takes 2 + B takes 2 → ¥49.95 each, pending 0", () => {
-    const lines: LineForShare[] = [{ id: "L1", netCents: 9990, qty: 4 }];
+    const lines: LineForShare[] = [{ id: "L1", netCents: 9990, shareCount: 4 }];
     const claims: ClaimForShare[] = [
       { receiptLineId: "L1", identityId: "A", weight: 2 },
       { receiptLineId: "L1", identityId: "B", weight: 2 },
@@ -125,7 +125,7 @@ describe("computeSubtotals — multi-share lines (qty > 1)", () => {
   });
 
   it("4-pack, A takes 1 + B takes 1 → claimer pool ¥49.95, pending ¥49.95", () => {
-    const lines: LineForShare[] = [{ id: "L1", netCents: 9990, qty: 4 }];
+    const lines: LineForShare[] = [{ id: "L1", netCents: 9990, shareCount: 4 }];
     const claims: ClaimForShare[] = [
       { receiptLineId: "L1", identityId: "A", weight: 1 },
       { receiptLineId: "L1", identityId: "B", weight: 1 },
@@ -139,7 +139,7 @@ describe("computeSubtotals — multi-share lines (qty > 1)", () => {
   });
 
   it("over-claim (Σweights > qty) collapses to relative split, no pending", () => {
-    const lines: LineForShare[] = [{ id: "L1", netCents: 9990, qty: 4 }];
+    const lines: LineForShare[] = [{ id: "L1", netCents: 9990, shareCount: 4 }];
     const claims: ClaimForShare[] = [
       { receiptLineId: "L1", identityId: "A", weight: 3 },
       { receiptLineId: "L1", identityId: "B", weight: 3 },
@@ -151,7 +151,7 @@ describe("computeSubtotals — multi-share lines (qty > 1)", () => {
   });
 
   it("2-pack ¥16.50, claimer takes both shares → full ¥16.50, no pending", () => {
-    const lines: LineForShare[] = [{ id: "L1", netCents: 1650, qty: 2 }];
+    const lines: LineForShare[] = [{ id: "L1", netCents: 1650, shareCount: 2 }];
     const claims: ClaimForShare[] = [
       { receiptLineId: "L1", identityId: "A", weight: 2 },
     ];

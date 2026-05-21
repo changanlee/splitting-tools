@@ -83,9 +83,15 @@ export async function editLineAction(
 ): Promise<void> {
   const description = parseDescription(String(formData.get("description") ?? ""));
   const qty = parseQtyInput(String(formData.get("qty") ?? ""));
+  const shareCount = parseQtyInput(String(formData.get("shareCount") ?? ""));
   const cents = parseCentsInput(String(formData.get("amount") ?? ""));
 
-  if (description === null || qty === null || cents === null) {
+  if (
+    description === null ||
+    qty === null ||
+    shareCount === null ||
+    cents === null
+  ) {
     throw new Error(FRIENDLY_INVALID);
   }
 
@@ -93,12 +99,16 @@ export async function editLineAction(
     await assertSession(linkId);
     // Update the line's own fields; net_cents is NOT set here — it is
     // re-derived by refoldSessionNets so editing a parent line's
-    // gross/qty re-folds (not wipes) any IRC attributed to it.
+    // gross re-folds (not wipes) any IRC attributed to it. `qty` is
+    // the receipt's printed quantity; `shareCount` is the splitting
+    // divisor — kept separate so an edit to one never corrupts the
+    // other.
     await db
       .update(receiptLines)
       .set({
         description,
         qty,
+        shareCount,
         grossCents: cents,
       })
       .where(
@@ -198,6 +208,7 @@ export async function addLineAction(
       description,
       rawText: null,
       qty,
+      shareCount: Math.max(1, qty),
       grossCents: cents,
       netCents: cents,
       isIrc: false,

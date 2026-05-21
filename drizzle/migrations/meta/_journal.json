@@ -29,6 +29,13 @@
       "when": 1779264205288,
       "tag": "0003_zippy_killmonger",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1779333678519,
+      "tag": "0004_narrow_kate_bishop",
+      "breakpoints": true
     }
   ]
 }

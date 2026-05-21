@@ -35,9 +35,9 @@ import {
 export interface SettleLine {
   id: string;
   netCents: number;
-  /** Share count (receipt_lines.qty) — drives the under-claim
-   *  spillover in shareMath when Σweights < qty. */
-  qty: number;
+  /** receipt_lines.share_count — drives the under-claim spillover in
+   *  shareMath when Σweights < shareCount. */
+  shareCount: number;
   isIrc: boolean;
   claimable: boolean;
   orphan: boolean;
@@ -73,7 +73,11 @@ export function settle(
     }
     if (l.isIrc) continue; // non-orphan IRC: already folded into its parent's net
     if (!l.claimable) continue;
-    claimableLines.push({ id: l.id, netCents: l.netCents, qty: l.qty });
+    claimableLines.push({
+      id: l.id,
+      netCents: l.netCents,
+      shareCount: l.shareCount,
+    });
   }
 
   // Subtotals over CLAIMED lines (with per-line under-claim spillover).

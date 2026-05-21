@@ -49,7 +49,7 @@ export async function getSettlementView(
       id: receiptLines.id,
       netCents: receiptLines.netCents,
       grossCents: receiptLines.grossCents,
-      qty: receiptLines.qty,
+      shareCount: receiptLines.shareCount,
       isIrc: receiptLines.isIrc,
       claimable: receiptLines.claimable,
       orphan: receiptLines.orphan,
@@ -77,7 +77,7 @@ export async function getSettlementView(
     lineRows.map((l) => ({
       id: l.id,
       netCents: l.netCents,
-      qty: l.qty,
+      shareCount: l.shareCount,
       isIrc: l.isIrc,
       claimable: l.claimable,
       orphan: l.orphan,

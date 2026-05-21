@@ -36,7 +36,7 @@ interface LineForBoard {
   lineNo: number;
   description: string;
   netCents: number;
-  qty: number;
+  shareCount: number;
 }
 
 interface Existing {

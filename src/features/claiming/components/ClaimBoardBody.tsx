@@ -36,7 +36,7 @@ interface LineProp {
   lineNo: number;
   description: string;
   netCents: number;
-  qty: number;
+  shareCount: number;
 }
 
 interface ClaimProp {
@@ -68,7 +68,7 @@ export function ClaimBoardBody({
   const linesForMath: LineForShare[] = lines.map((l) => ({
     id: l.id,
     netCents: l.netCents,
-    qty: l.qty,
+    shareCount: l.shareCount,
   }));
   const claimsForMath: ClaimForShare[] = claims.map((c) => ({
     receiptLineId: c.receiptLineId,
@@ -128,7 +128,7 @@ export function ClaimBoardBody({
             lineNo={l.lineNo}
             description={l.description}
             netCents={l.netCents}
-            qty={l.qty}
+            shareCount={l.shareCount}
             currency={currency}
             claimers={(claimsByLine.get(l.id) ?? []).map((c) => ({
               identityId: c.identityId,

@@ -18,6 +18,8 @@ export interface ReceiptLineView {
   description: string;
   rawText: string | null;
   qty: number;
+  /** How many shares this line splits into for claiming. */
+  shareCount: number;
   grossCents: number;
   netCents: number;
   isIrc: boolean;
@@ -67,6 +69,7 @@ export async function getReconciliationSummary(
       description: receiptLines.description,
       rawText: receiptLines.rawText,
       qty: receiptLines.qty,
+      shareCount: receiptLines.shareCount,
       grossCents: receiptLines.grossCents,
       netCents: receiptLines.netCents,
       isIrc: receiptLines.isIrc,

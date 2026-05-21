@@ -31,7 +31,7 @@ interface Props {
   netCents: number;
   /** Share count — when > 1 the row shows the per-share unit price
    *  and the weight input means "how many shares you took". */
-  qty: number;
+  shareCount: number;
   claimers: Claimer[];
   myIdentityId: string;
   currency: string | null;
@@ -53,15 +53,17 @@ export function ClaimRow({
   lineNo,
   description,
   netCents,
-  qty,
+  shareCount,
   claimers,
   myIdentityId,
   currency,
 }: Props) {
-  const multiShare = qty > 1;
+  const multiShare = shareCount > 1;
   // Per-share unit price, rounded for display only — the settlement
   // math stays exact via largest-remainder in shareMath.
-  const unitCents = multiShare ? Math.round(netCents / qty) : netCents;
+  const unitCents = multiShare
+    ? Math.round(netCents / shareCount)
+    : netCents;
   const token = useSyncExternalStore(
     subscribeNoop,
     getTokenSnapshot,
@@ -99,7 +101,7 @@ export function ClaimRow({
         <span className="block text-sm font-medium">{description}</span>
         {multiShare ? (
           <span className="block text-xs text-muted-foreground">
-            共 {qty} 份 · 每份 {formatCents(unitCents, { currency })}
+            共 {shareCount} 份 · 每份 {formatCents(unitCents, { currency })}
           </span>
         ) : null}
         {claimers.length > 0 ? (

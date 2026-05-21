@@ -15,6 +15,7 @@ const product = (
     description: "巧克力牛乳",
     rawText: null,
     qty: 1,
+    shareCount: 1,
     grossCents: 9990,
     netCents: 9990,
     isIrc: false,

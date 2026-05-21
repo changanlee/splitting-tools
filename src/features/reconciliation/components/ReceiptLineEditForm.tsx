@@ -56,7 +56,7 @@ export function ReceiptLineEditForm({ linkId, line }: Props) {
         </label>
         <div className="flex gap-2">
           <label className="flex flex-col gap-1 flex-1">
-            <span className="text-xs text-muted-foreground">數量</span>
+            <span className="text-xs text-muted-foreground">數量（收據）</span>
             <input
               name="qty"
               type="number"
@@ -69,7 +69,7 @@ export function ReceiptLineEditForm({ linkId, line }: Props) {
             />
           </label>
           <label className="flex flex-col gap-1 flex-1">
-            <span className="text-xs text-muted-foreground">金額 NT$</span>
+            <span className="text-xs text-muted-foreground">金額</span>
             <input
               name="amount"
               inputMode="decimal"
@@ -80,6 +80,21 @@ export function ReceiptLineEditForm({ linkId, line }: Props) {
             />
           </label>
         </div>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">
+            份數（拆帳用 — 這行要分成幾份給人認領）
+          </span>
+          <input
+            name="shareCount"
+            type="number"
+            min="1"
+            step="1"
+            inputMode="numeric"
+            defaultValue={line.shareCount}
+            required
+            className="rounded border border-input bg-background px-2 py-1.5 text-sm tabular-nums"
+          />
+        </label>
         <div className="flex items-center gap-2 pt-1">
           <button
             type="submit"

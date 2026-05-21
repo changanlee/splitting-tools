@@ -2,20 +2,21 @@
  * Story 4.4/4.5 — pure per-identity share calculation.
  *
  * Weight model (confirmed 2026-05-21 with the user):
- *   - Every claimable line has a `qty` = how many SHARES it splits
- *     into. OCR seeds it; the payer can override it on the review page
- *     (e.g. a 4-pack 汽水 that scanned as qty=1 → set qty=4). The line's
- *     unit price is therefore `netCents / qty`.
+ *   - Every claimable line has a `shareCount` = how many SHARES it
+ *     splits into. This is a SPLITTING concept, kept separate from the
+ *     receipt's printed `qty` (reconciliation truth). The payer sets
+ *     shareCount on review (e.g. a 4-pack 汽水 rung up as qty=1 →
+ *     shareCount=4). Unit price = `netCents / shareCount`.
  *   - Each claim carries a `weight` = how many shares that person took.
  *   - A claimer's subtotal for a line = `netCents × weight / denom`
- *     where `denom = max(qty, Σweights)`.
- *       · Σweights < qty  → the line is under-claimed; the unclaimed
- *         `qty − Σweights` shares spill into `pendingFromUnderclaim`
- *         (the payer absorbs them).
- *       · Σweights ≥ qty  → fully (or over-) claimed; `denom = Σweights`
- *         and the whole line is distributed by relative weight — the
- *         common single-item (qty=1) case collapses to exactly the
- *         old relative-share behaviour.
+ *     where `denom = max(shareCount, Σweights)`.
+ *       · Σweights < shareCount → the line is under-claimed; the
+ *         unclaimed shares spill into `pendingFromUnderclaim` (the
+ *         payer absorbs them).
+ *       · Σweights ≥ shareCount → fully (or over-) claimed; `denom =
+ *         Σweights` and the whole line is distributed by relative
+ *         weight — the common single-share (shareCount=1) case
+ *         collapses to exactly the old relative-share behaviour.
  *
  * Conservation: `Σ subtotal + pendingFromUnderclaim == Σ netCents`
  * over the claimed lines — integer cents, largest-remainder rounding.
@@ -26,8 +27,9 @@ export interface LineForShare {
   id: string;
   /** Integer cents — the net (post-IRC) amount of this line. */
   netCents: number;
-  /** Share count the line splits into (receipt_lines.qty, ≥ 1). */
-  qty: number;
+  /** How many shares the line splits into (receipt_lines.share_count,
+   *  ≥ 1) — independent of the receipt's printed qty. */
+  shareCount: number;
 }
 
 export interface ClaimForShare {
@@ -72,9 +74,9 @@ export function computeSubtotals(
     const totalWeight = lineClaims.reduce((a, c) => a + c.weight, 0);
     if (totalWeight <= 0) continue;
 
-    // denom ≥ totalWeight always; when qty exceeds it the surplus
-    // shares are unclaimed and their cents go to pending.
-    const denom = Math.max(line.qty, totalWeight);
+    // denom ≥ totalWeight always; when shareCount exceeds it the
+    // surplus shares are unclaimed and their cents go to pending.
+    const denom = Math.max(line.shareCount, totalWeight);
     const claimerPool = Math.trunc((line.netCents * totalWeight) / denom);
     pendingFromUnderclaim += line.netCents - claimerPool;
     if (claimerPool === 0) continue;
