@@ -35,6 +35,9 @@ import {
 export interface SettleLine {
   id: string;
   netCents: number;
+  /** Logical unit count from receipt_lines.qty; drives the under-claim
+   *  spillover when Σweights < qty. Default 1 for back-compat. */
+  qty: number;
   isIrc: boolean;
   claimable: boolean;
   orphan: boolean;
@@ -70,25 +73,32 @@ export function settle(
     }
     if (l.isIrc) continue; // non-orphan IRC: already folded into its parent's net
     if (!l.claimable) continue;
-    claimableLines.push({ id: l.id, netCents: l.netCents });
+    claimableLines.push({ id: l.id, netCents: l.netCents, qty: l.qty });
   }
 
-  // Subtotals over CLAIMED lines.
+  // Subtotals over CLAIMED lines (with per-line under-claim spillover).
   const claimsForMath: ClaimForShare[] = claims.map((c) => ({
     receiptLineId: c.receiptLineId,
     identityId: c.identityId,
     weight: c.weight,
   }));
-  const byIdentity = computeSubtotals(claimableLines, claimsForMath);
+  const subtotals = computeSubtotals(claimableLines, claimsForMath);
 
-  // Pending = claimable lines with no claimer.
-  let pendingCents = 0;
+  // Pending = fully-unclaimed lines + the under-claim spillover from
+  // partially-claimed lines. Both flow into the same "payer absorbs"
+  // bucket; the conservation invariant Σ byIdentity + pending +
+  // orphan == Σ net still holds.
+  let pendingCents = subtotals.pendingFromUnderclaim;
   const claimedLineIds = new Set(claims.map((c) => c.receiptLineId));
   for (const l of claimableLines) {
     if (!claimedLineIds.has(l.id)) pendingCents += l.netCents;
   }
 
-  return { byIdentity, pendingCents, orphanIrcCents };
+  return {
+    byIdentity: subtotals.byIdentity,
+    pendingCents,
+    orphanIrcCents,
+  };
 }
 
 /** Conservation accessor — Σ byIdentity + pending + orphan. */

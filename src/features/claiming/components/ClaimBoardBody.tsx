@@ -36,6 +36,7 @@ interface LineProp {
   lineNo: number;
   description: string;
   netCents: number;
+  qty: number;
 }
 
 interface ClaimProp {
@@ -67,6 +68,7 @@ export function ClaimBoardBody({
   const linesForMath: LineForShare[] = lines.map((l) => ({
     id: l.id,
     netCents: l.netCents,
+    qty: l.qty,
   }));
   const claimsForMath: ClaimForShare[] = claims.map((c) => ({
     receiptLineId: c.receiptLineId,
@@ -74,7 +76,7 @@ export function ClaimBoardBody({
     weight: c.weight,
   }));
   const subtotals = computeSubtotals(linesForMath, claimsForMath);
-  const mySubtotal = subtotals.get(myIdentityId) ?? 0;
+  const mySubtotal = subtotals.byIdentity.get(myIdentityId) ?? 0;
 
   // Pending = lines with no claimers (Story 4.7 will surface them
   // more prominently; here we just count + show).
@@ -138,22 +140,29 @@ export function ClaimBoardBody({
       </ol>
       {pending.length > 0 ? (
         <p className="text-xs text-muted-foreground">
-          目前有 {pending.length} 行尚未認領（4.7 將更明顯地提醒付款人）。
+          目前有 {pending.length} 行尚未認領，會由付款人吸收。
         </p>
       ) : null}
-      {/* Story 4.6 — undo my last action (claim/unclaim/weight). */}
-      <form action={undoBound} className="self-start">
-        {token ? (
-          <input type="hidden" name="deviceToken" value={token} />
-        ) : null}
-        <button
-          type="submit"
-          disabled={!token}
-          className="text-xs text-primary underline underline-offset-2 hover:no-underline disabled:opacity-50"
+      <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
+        <a
+          href={`/splits/${linkId}/settle`}
+          className="rounded bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:opacity-90"
         >
-          ↶ 撤銷上一個動作
-        </button>
-      </form>
+          ✓ 完成認領 — 查看分帳結算 →
+        </a>
+        <form action={undoBound}>
+          {token ? (
+            <input type="hidden" name="deviceToken" value={token} />
+          ) : null}
+          <button
+            type="submit"
+            disabled={!token}
+            className="text-xs text-primary underline underline-offset-2 hover:no-underline disabled:opacity-50"
+          >
+            ↶ 撤銷上一個
+          </button>
+        </form>
+      </div>
     </section>
   );
 }

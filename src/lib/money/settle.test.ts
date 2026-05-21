@@ -24,16 +24,17 @@ describe("settle — conservation invariant (FR50 CI gate)", () => {
       {
         id: "L1",
         netCents: 4490 - 900, // parent w/ folded IRC
+        qty: 1,
         isIrc: false,
         claimable: true,
         orphan: false,
       },
-      { id: "L2", netCents: 9990, isIrc: false, claimable: true, orphan: false },
+      { id: "L2", netCents: 9990, qty: 1, isIrc: false, claimable: true, orphan: false },
       // Folded (non-orphan) IRC — already in L1's net; settlement skips it
       {
         id: "L3",
         netCents: -900,
-        isIrc: true,
+        qty: 1, isIrc: true,
         claimable: false,
         orphan: false,
       },
@@ -49,8 +50,8 @@ describe("settle — conservation invariant (FR50 CI gate)", () => {
 
   it("unclaimed lines flow to pendingCents (not lost)", () => {
     const lines: SettleLine[] = [
-      { id: "L1", netCents: 1000, isIrc: false, claimable: true, orphan: false },
-      { id: "L2", netCents: 500, isIrc: false, claimable: true, orphan: false },
+      { id: "L1", netCents: 1000, qty: 1, isIrc: false, claimable: true, orphan: false },
+      { id: "L2", netCents: 500, qty: 1, isIrc: false, claimable: true, orphan: false },
     ];
     const claims: SettleClaim[] = [
       { receiptLineId: "L1", identityId: "A", weight: 1 },
@@ -63,8 +64,8 @@ describe("settle — conservation invariant (FR50 CI gate)", () => {
 
   it("orphan IRC flows to orphanIrcCents (kept, negative)", () => {
     const lines: SettleLine[] = [
-      { id: "L1", netCents: 1000, isIrc: false, claimable: true, orphan: false },
-      { id: "I1", netCents: -200, isIrc: true, claimable: false, orphan: true },
+      { id: "L1", netCents: 1000, qty: 1, isIrc: false, claimable: true, orphan: false },
+      { id: "I1", netCents: -200, qty: 1, isIrc: true, claimable: false, orphan: true },
     ];
     const claims: SettleClaim[] = [
       { receiptLineId: "L1", identityId: "A", weight: 1 },
@@ -85,7 +86,7 @@ describe("settle — conservation invariant (FR50 CI gate)", () => {
 
   it("deterministic — same inputs produce same outputs across calls", () => {
     const lines: SettleLine[] = [
-      { id: "L1", netCents: 1000, isIrc: false, claimable: true, orphan: false },
+      { id: "L1", netCents: 1000, qty: 1, isIrc: false, claimable: true, orphan: false },
     ];
     const claims: SettleClaim[] = [
       { receiptLineId: "L1", identityId: "X", weight: 1 },
@@ -117,14 +118,15 @@ describe("settle — #5564 placeholder scale (FR50 anchor)", () => {
             : i === 2
               ? 9234 - 2500
               : 9234,
+      qty: 1,
       isIrc: false,
       claimable: true,
       orphan: false,
     }));
     const ircRows: SettleLine[] = [
-      { id: "i0", netCents: -4000, isIrc: true, claimable: false, orphan: false },
-      { id: "i1", netCents: -3500, isIrc: true, claimable: false, orphan: false },
-      { id: "i2", netCents: -2500, isIrc: true, claimable: false, orphan: false },
+      { id: "i0", netCents: -4000, qty: 1, isIrc: true, claimable: false, orphan: false },
+      { id: "i1", netCents: -3500, qty: 1, isIrc: true, claimable: false, orphan: false },
+      { id: "i2", netCents: -2500, qty: 1, isIrc: true, claimable: false, orphan: false },
     ];
     const lines = [...parents, ...ircRows];
     // No claimers → everything pending; settlement_sum == 220850.

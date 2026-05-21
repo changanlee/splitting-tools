@@ -82,6 +82,12 @@ export default async function SharePage({ params }: Ctx) {
       <MessageCard {...cardProps} />
       <ShareActions shareText={shareText} shareUrl={shareUrl} />
       <a
+        href={`/splits/${linkId}/settle`}
+        className="self-start rounded bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:opacity-90"
+      >
+        前往結算結果 →
+      </a>
+      <a
         href={`/splits/${linkId}/review`}
         className="self-start text-xs text-primary underline underline-offset-2 hover:no-underline"
       >
