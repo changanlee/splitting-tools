@@ -127,8 +127,8 @@ export function ReceiptLineRow({
           </span>
         ) : null}
         {line.shareCount > 1 ? (
-          <span className="block text-xs text-primary font-medium">
-            拆 {line.shareCount} 份認領
+          <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
+            🔀 拆 {line.shareCount} 份認領
           </span>
         ) : null}
         {line.rawText ? (
