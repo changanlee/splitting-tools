@@ -3,6 +3,7 @@
  * per-identity amount table + pending/orphan footer.
  */
 import { formatCents } from "@/features/reconciliation/lib/formatCents";
+import { identityColor } from "@/features/identity/identityColor";
 
 interface Props {
   perIdentity: {
@@ -52,7 +53,13 @@ export function SettlementSummary({
           {perIdentity.map((p) => (
             <li key={p.identityId} className="flex flex-col gap-1 py-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="font-medium">{p.name}</span>
+                <span className="flex items-center gap-2 font-medium">
+                  <span
+                    aria-hidden
+                    className={`inline-block size-2.5 shrink-0 rounded-full ${identityColor(p.identityId).dot}`}
+                  />
+                  {p.name}
+                </span>
                 <span className="tabular-nums font-semibold">
                   {fmt(p.cents)}
                 </span>

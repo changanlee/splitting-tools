@@ -26,6 +26,7 @@ import {
   removePersonAction,
 } from "@/features/identity/server/actions";
 import { getOrCreateDeviceToken } from "@/features/identity/deviceToken";
+import { identityColor } from "@/features/identity/identityColor";
 import { formatCents } from "@/features/reconciliation/lib/formatCents";
 
 function subscribeNoop(): () => void {
@@ -222,7 +223,11 @@ export function ClaimBoardBody({
                     key={p.id}
                     className="flex items-center justify-between py-2 text-sm"
                   >
-                    <span>
+                    <span className="flex items-center gap-2">
+                      <span
+                        aria-hidden
+                        className={`inline-block size-2.5 shrink-0 rounded-full ${identityColor(p.id).dot}`}
+                      />
                       {p.name}
                       {p.id === myIdentityId ? "（你）" : ""}
                     </span>
@@ -293,7 +298,15 @@ export function ClaimBoardBody({
           aria-live="polite"
           className="sticky top-0 z-10 rounded-md border border-primary/30 bg-primary/5 px-4 py-3 text-sm flex items-center gap-3 tabular-nums"
         >
-          <span>{isOwner ? `${actingName} 應付` : `嗨 ${actingName}，我應付`}</span>
+          <span className="flex items-center gap-2">
+            {actingId ? (
+              <span
+                aria-hidden
+                className={`inline-block size-2.5 shrink-0 rounded-full ${identityColor(actingId).dot}`}
+              />
+            ) : null}
+            {isOwner ? `${actingName} 應付` : `嗨 ${actingName}，我應付`}
+          </span>
           <span className="ml-auto text-lg font-semibold">
             {formatCents(actingSubtotal, { currency })}
           </span>

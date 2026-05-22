@@ -16,6 +16,7 @@ import {
   toggleClaimAction,
 } from "@/features/claiming/server/actions";
 import { getOrCreateDeviceToken } from "@/features/identity/deviceToken";
+import { identityColor } from "@/features/identity/identityColor";
 import { formatCents } from "@/features/reconciliation/lib/formatCents";
 
 interface Claimer {
@@ -87,6 +88,17 @@ export function ClaimRow({
   const totalClaimedShares = claimers.reduce((s, c) => s + c.weight, 0);
   const overClaimed = multiShare && totalClaimedShares > shareCount;
 
+  // Claim-status colour cue on the row's left edge:
+  //   none  → amber (still needs claiming)
+  //   part  → amber (a multi-share line not fully taken)
+  //   full  → emerald (done)
+  const fullyClaimed =
+    claimers.length > 0 && totalClaimedShares >= shareCount;
+  const statusBorder =
+    claimers.length === 0 || !fullyClaimed
+      ? "border-l-4 border-l-amber-400"
+      : "border-l-4 border-l-emerald-400";
+
   const toggleBound = toggleClaimAction.bind(null, linkId, lineId);
   const weightBound = setClaimWeightAction.bind(null, linkId, lineId);
   const shareCountBound = setShareCountAction.bind(null, linkId, lineId);
@@ -96,7 +108,7 @@ export function ClaimRow({
       role="listitem"
       data-claimed={iClaimed ? "true" : undefined}
       id={`claim-line-${lineNo}`}
-      className="px-4 py-2 border-t first:border-t-0 border-border flex items-center gap-3"
+      className={`px-4 py-2 border-t first:border-t-0 border-border flex items-center gap-3 ${statusBorder}`}
     >
       <form action={toggleBound}>
         {token ? (
@@ -159,15 +171,23 @@ export function ClaimRow({
           </form>
         ) : null}
         {claimers.length > 0 ? (
-          <span className="block text-xs text-muted-foreground truncate">
-            {claimers
-              .map((c) =>
-                c.weight > 1 ? `${c.identityName}×${c.weight}` : c.identityName,
-              )
-              .join("、")}
+          <span className="block text-xs truncate">
+            {claimers.map((c, i) => (
+              <span key={c.identityId}>
+                {i > 0 ? (
+                  <span className="text-muted-foreground">、</span>
+                ) : null}
+                <span
+                  className={`font-medium ${identityColor(c.identityId).text}`}
+                >
+                  {c.identityName}
+                  {c.weight > 1 ? `×${c.weight}` : ""}
+                </span>
+              </span>
+            ))}
           </span>
         ) : (
-          <span className="block text-xs text-muted-foreground italic">
+          <span className="block text-xs text-amber-700 dark:text-amber-300 italic">
             尚未認領
           </span>
         )}
