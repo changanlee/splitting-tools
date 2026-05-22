@@ -22,8 +22,14 @@ export interface SettlementView {
   parsedSumCents: number;
   /** ISO 4217 stamped by the parser; null when unknown. */
   currency: string | null;
-  /** Ordered (largest amount first) — same iteration in plaintext export. */
-  perIdentity: { identityId: string; name: string; cents: number }[];
+  /** Ordered (largest amount first) — same iteration in plaintext export.
+   *  `items` lists what that person claimed (description + their cents). */
+  perIdentity: {
+    identityId: string;
+    name: string;
+    cents: number;
+    items: { description: string; cents: number }[];
+  }[];
   pendingCents: number;
   orphanIrcCents: number;
 }
@@ -47,6 +53,7 @@ export async function getSettlementView(
   const lineRows = await db
     .select({
       id: receiptLines.id,
+      description: receiptLines.description,
       netCents: receiptLines.netCents,
       grossCents: receiptLines.grossCents,
       shareCount: receiptLines.shareCount,
@@ -87,11 +94,30 @@ export async function getSettlementView(
 
   const parsedSumCents = lineRows.reduce((a, l) => a + l.grossCents, 0);
 
+  // Per-identity item breakdown — group settle()'s per-line allocations
+  // and resolve each line's description.
+  const descById = new Map(lineRows.map((l) => [l.id, l.description] as const));
+  const itemsByIdentity = new Map<
+    string,
+    { description: string; cents: number }[]
+  >();
+  for (const p of r.perLine) {
+    const list = itemsByIdentity.get(p.identityId) ?? [];
+    list.push({
+      description: descById.get(p.lineId) ?? p.lineId,
+      cents: p.cents,
+    });
+    itemsByIdentity.set(p.identityId, list);
+  }
+
   const perIdentity = Array.from(r.byIdentity.entries())
     .map(([identityId, cents]) => ({
       identityId,
       name: nameById.get(identityId) ?? identityId,
       cents,
+      items: (itemsByIdentity.get(identityId) ?? []).sort(
+        (a, b) => b.cents - a.cents,
+      ),
     }))
     .sort((a, b) => b.cents - a.cents);
 

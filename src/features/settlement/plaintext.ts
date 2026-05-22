@@ -13,7 +13,12 @@ export interface PlaintextInput {
   unverified: boolean;
   /** ISO 4217 from sessions.currency; null → no prefix. */
   currency: string | null;
-  perIdentity: { name: string; cents: number }[];
+  perIdentity: {
+    name: string;
+    cents: number;
+    /** What this person claimed — listed under their line. */
+    items?: { description: string; cents: number }[];
+  }[];
   pendingCents: number;
   orphanIrcCents: number;
 }
@@ -31,6 +36,9 @@ export function buildSettlementText(args: PlaintextInput): string {
   } else {
     for (const p of args.perIdentity) {
       lines.push(`${p.name}　${fmt(p.cents)}`);
+      for (const it of p.items ?? []) {
+        lines.push(`  ・${it.description} ${fmt(it.cents)}`);
+      }
     }
   }
   if (args.pendingCents > 0) {

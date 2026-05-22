@@ -56,6 +56,8 @@ export interface SettleResult {
   pendingCents: number;
   /** Orphan IRC lines (negative) — sit here until 2.4 re-bind. */
   orphanIrcCents: number;
+  /** Per (identity, line) cents — drives the "who claimed what" UI. */
+  perLine: { identityId: string; lineId: string; cents: number }[];
 }
 
 export function settle(
@@ -102,6 +104,7 @@ export function settle(
     byIdentity: subtotals.byIdentity,
     pendingCents,
     orphanIrcCents,
+    perLine: subtotals.perLine,
   };
 }
 

@@ -5,7 +5,12 @@
 import { formatCents } from "@/features/reconciliation/lib/formatCents";
 
 interface Props {
-  perIdentity: { identityId: string; name: string; cents: number }[];
+  perIdentity: {
+    identityId: string;
+    name: string;
+    cents: number;
+    items: { description: string; cents: number }[];
+  }[];
   pendingCents: number;
   orphanIrcCents: number;
   parsedSumCents: number;
@@ -45,14 +50,28 @@ export function SettlementSummary({
       ) : (
         <ul className="flex flex-col divide-y divide-border">
           {perIdentity.map((p) => (
-            <li
-              key={p.identityId}
-              className="flex items-center justify-between py-2 text-sm"
-            >
-              <span>{p.name}</span>
-              <span className="tabular-nums font-semibold">
-                {fmt(p.cents)}
-              </span>
+            <li key={p.identityId} className="flex flex-col gap-1 py-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">{p.name}</span>
+                <span className="tabular-nums font-semibold">
+                  {fmt(p.cents)}
+                </span>
+              </div>
+              {p.items.length > 0 ? (
+                <ul className="flex flex-col gap-0.5 pl-3 text-xs text-muted-foreground">
+                  {p.items.map((it, i) => (
+                    <li
+                      key={i}
+                      className="flex items-center justify-between gap-3"
+                    >
+                      <span className="truncate">{it.description}</span>
+                      <span className="tabular-nums shrink-0">
+                        {fmt(it.cents)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </li>
           ))}
         </ul>

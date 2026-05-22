@@ -41,11 +41,21 @@ export interface ClaimForShare {
 /** identityId → integer cents */
 export type SubtotalsByIdentity = Map<string, number>;
 
+/** One claimer's exact integer-cents allocation on one line. */
+export interface PerLineShare {
+  identityId: string;
+  lineId: string;
+  cents: number;
+}
+
 export interface SubtotalsResult {
   byIdentity: SubtotalsByIdentity;
   /** Cents from claimed-but-under-claimed lines (Σweights < qty) —
    *  the payer absorbs these into the settlement's `pendingCents`. */
   pendingFromUnderclaim: number;
+  /** Per (identity, line) allocation — for the "who claimed what"
+   *  breakdown. Sums per identity == byIdentity. */
+  perLine: PerLineShare[];
 }
 
 /**
@@ -59,6 +69,7 @@ export function computeSubtotals(
 ): SubtotalsResult {
   const byIdentity: SubtotalsByIdentity = new Map();
   let pendingFromUnderclaim = 0;
+  const perLine: PerLineShare[] = [];
 
   // Group claims by line for O(1) lookup.
   const claimsByLine = new Map<string, ClaimForShare[]>();
@@ -121,10 +132,15 @@ export function computeSubtotals(
         a.identityId,
         (byIdentity.get(a.identityId) ?? 0) + delta,
       );
+      perLine.push({
+        identityId: a.identityId,
+        lineId: line.id,
+        cents: delta,
+      });
     }
   }
 
-  return { byIdentity, pendingFromUnderclaim };
+  return { byIdentity, pendingFromUnderclaim, perLine };
 }
 
 /** Conservation helper — Σ subtotal across all identities. */

@@ -48,7 +48,11 @@ export default async function SettlePage({ params }: Ctx) {
     printedTotalCents: view.printedTotalCents,
     unverified: view.unverified,
     currency: view.currency,
-    perIdentity: view.perIdentity.map((p) => ({ name: p.name, cents: p.cents })),
+    perIdentity: view.perIdentity.map((p) => ({
+      name: p.name,
+      cents: p.cents,
+      items: p.items,
+    })),
     pendingCents: view.pendingCents,
     orphanIrcCents: view.orphanIrcCents,
   });
