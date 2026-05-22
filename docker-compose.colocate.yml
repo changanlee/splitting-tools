@@ -1,0 +1,22 @@
+# Co-located deploy overlay — for running splitting_tools on a host that
+# is ALREADY serving another Dockerized app which owns ports 80/443 via
+# its own Caddy (e.g. the Hostinger Malaysia box also running "Speech" /
+# passport-app).
+#
+# Run with the BASE file — NOT docker-compose.prod.yml (that one starts a
+# second Caddy and would collide on 80/443):
+#
+#   docker compose -f docker-compose.yml -f docker-compose.colocate.yml up -d --build
+#
+# This starts only web + worker + db — no Caddy of its own. The host's
+# existing Caddy is pointed at this app's `web` container instead:
+#   1. docker network connect splitting-tools_default <existing-caddy>
+#   2. add to the existing Caddyfile:
+#        split.<domain> { reverse_proxy splitting-tools-web-1:3000 }
+#      then reload that Caddy (no restart of the other app needed).
+#
+# Keep WEB_PORT=127.0.0.1:3010 in .env so `web` is also reachable on the
+# host loopback for local debugging — never the public internet.
+services:
+  db:
+    restart: unless-stopped
