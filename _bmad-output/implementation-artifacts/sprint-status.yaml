@@ -56,7 +56,7 @@
 #   each story states its own Drizzle schema DDL.
 
 generated: 2026-05-19
-last_updated: 2026-05-20T14:55
+last_updated: 2026-05-22T12:00
 project: splitting_tools
 project_key: NOKEY
 tracking_system: file-system
@@ -120,3 +120,13 @@ development_status:
   6-1-30day-verifiable-destroy: done  # autonomous 2026-05-20 — daily cron + verified residual=0
   6-2-noindex-anti-discovery: done  # autonomous 2026-05-20 — metadata.robots + robots.ts + middleware X-Robots-Tag triple
   epic-6-retrospective: optional
+
+  # ---- Epic 7: 帳號與存取控制 ----
+  # CIP 2026-05-22: user decided to gate the upload entry behind paid
+  # access (payment OFF-platform — private; the app only does access
+  # control). Additive — Epic 1-6 pipeline untouched, no retrofit.
+  # Model: access codes (reusable, admin enable/disable). Expiry +
+  # device-binding deferred. Rationale: 「我會私下收錢…我可以管理哪些人
+  # 的帳號，來讓他可以有使用權」.
+  epic-7: done  # 2026-05-22 — access-code gating
+  7-1-access-code-gate: done  # access_codes table + /unlock redeem + home/API gate + /admin manage

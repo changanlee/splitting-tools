@@ -15,12 +15,21 @@ import {
   createIdentity,
   hashDeviceToken,
 } from "@/features/identity/server/identityRepo";
+import { hasValidAccess } from "@/features/access/server/accessGate";
 import type {
   CreateSessionResponse,
   ErrorEnvelope,
 } from "@/features/parsing/schema";
 
 export async function POST(req: Request): Promise<Response> {
+  // Epic 7 — defense in depth: the home page already gates this, but a
+  // direct API hit must also be rejected without a valid access code.
+  if (!(await hasValidAccess())) {
+    const body: ErrorEnvelope = {
+      error: { code: "ACCESS_REQUIRED", message: "需要存取碼才能使用。" },
+    };
+    return Response.json(body, { status: 403 });
+  }
   try {
     let creatorToken: string | null = null;
     let ownerName = "";

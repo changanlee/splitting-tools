@@ -30,6 +30,7 @@ services:
       OPENROUTER_SITE_URL: ${OPENROUTER_SITE_URL:-}
       OPENROUTER_SITE_NAME: ${OPENROUTER_SITE_NAME:-}
       IP_HASH_SECRET: ${IP_HASH_SECRET:-}
+      ADMIN_SECRET: ${ADMIN_SECRET:-}
     ports:
       - "${WEB_PORT:-3000}:3000"
     depends_on:

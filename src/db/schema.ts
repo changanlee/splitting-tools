@@ -262,3 +262,22 @@ export const claimChanges = pgTable(
   },
   (t) => [index("idx_claim_changes_session_created_at").on(t.sessionId, t.createdAt)],
 );
+
+/**
+ * Epic 7 — access codes. The owner sells access off-platform (private
+ * payment) and hands a code to each paying user; entering it unlocks
+ * the receipt-upload entry. `enabled` is the admin's on/off switch —
+ * stop paying → disable the code. Claiming via a share link needs no
+ * code (friends don't trigger the LLM cost).
+ */
+export const accessCodes = pgTable("access_codes", {
+  // The code string itself is the primary key — short, opaque.
+  code: text("code").primaryKey(),
+  // Who it was issued to — admin's own note, e.g. "張三".
+  label: text("label").notNull().default(""),
+  // Admin on/off switch; checked on every gated request.
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});

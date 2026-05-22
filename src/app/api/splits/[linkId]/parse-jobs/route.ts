@@ -21,6 +21,7 @@ import {
   sessionExists,
 } from "@/features/parsing/server/jobs";
 import { enqueueParse } from "@/features/parsing/server/queue";
+import { hasValidAccess } from "@/features/access/server/accessGate";
 import { isValidLinkId } from "@/lib/linkId";
 
 /** Per-file byte cap (masked compressed JPEGs are ~hundreds KB; 8MB is
@@ -37,6 +38,12 @@ export async function POST(
   ctx: { params: Promise<{ linkId: string }> },
 ): Promise<Response> {
   const { linkId } = await ctx.params;
+
+  // Epic 7 — the parse submit is THE LLM-cost trigger; reject without a
+  // valid access code (defense in depth behind the home-page gate).
+  if (!(await hasValidAccess())) {
+    return err("ACCESS_REQUIRED", "需要存取碼才能使用。", 403);
+  }
 
   // Story 3.1 — shape-guard the linkId BEFORE any DB / form work.
   // Closes W-2-1-3 (raw URL segments hitting Drizzle and being
