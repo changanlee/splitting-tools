@@ -82,11 +82,15 @@ export function ClaimRow({
   const myWeight =
     claimers.find((c) => c.identityId === actingIdentityId)?.weight ?? 1;
 
-  // 防呆 — a multi-share line claimed for MORE shares than it has.
-  // Not blocked (the math still resolves), but flagged so the owner
-  // notices someone double-took.
+  // 防呆 — more shares claimed than the line was split into. Applies to
+  // EVERY line, not just multi-share ones: a shareCount=1 line with two
+  // claimers is the canonical over-claim (gating this on `multiShare`
+  // was a bug — the warning never fired for the most common case). Not
+  // blocked (shareMath still resolves via denom = max(shareCount,
+  // Σweights)), but flagged so the owner notices a double-take / that a
+  // 份數 needs bumping.
   const totalClaimedShares = claimers.reduce((s, c) => s + c.weight, 0);
-  const overClaimed = multiShare && totalClaimedShares > shareCount;
+  const overClaimed = totalClaimedShares > shareCount;
 
   // Claim-status colour cue on the row's left edge:
   //   none  → amber (still needs claiming)
@@ -94,8 +98,9 @@ export function ClaimRow({
   //   full  → emerald (done)
   const fullyClaimed =
     claimers.length > 0 && totalClaimedShares >= shareCount;
-  const statusBorder =
-    claimers.length === 0 || !fullyClaimed
+  const statusBorder = overClaimed
+    ? "border-l-4 border-l-rose-500"
+    : claimers.length === 0 || !fullyClaimed
       ? "border-l-4 border-l-amber-400"
       : "border-l-4 border-l-emerald-400";
 
@@ -192,8 +197,8 @@ export function ClaimRow({
           </span>
         )}
         {overClaimed ? (
-          <span className="block text-xs font-medium text-amber-700 dark:text-amber-300">
-            ⚠ 超額認領：已認 {totalClaimedShares} 份 / 共 {shareCount} 份
+          <span className="block text-xs font-medium text-rose-700 dark:text-rose-400">
+            ⚠ 超額認領：已認 {totalClaimedShares} 份 / 共 {shareCount} 份（把「拆」改成 {totalClaimedShares} 份，或取消多餘的認領）
           </span>
         ) : null}
       </span>
