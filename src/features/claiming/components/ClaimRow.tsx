@@ -12,6 +12,7 @@ import { useSyncExternalStore } from "react";
 
 import {
   setClaimWeightAction,
+  setShareCountAction,
   toggleClaimAction,
 } from "@/features/claiming/server/actions";
 import { getOrCreateDeviceToken } from "@/features/identity/deviceToken";
@@ -37,6 +38,9 @@ interface Props {
    *  identity in self-service mode, or the owner's selected "acting
    *  as" person. Sent to the server as `targetIdentityId`. */
   actingIdentityId: string;
+  /** Owner sees an inline 份數 editor on every line (the receipt
+   *  prints multipacks as "1x" — only the payer knows the real split). */
+  isOwner: boolean;
   currency: string | null;
 }
 
@@ -59,6 +63,7 @@ export function ClaimRow({
   shareCount,
   claimers,
   actingIdentityId,
+  isOwner,
   currency,
 }: Props) {
   const multiShare = shareCount > 1;
@@ -84,6 +89,7 @@ export function ClaimRow({
 
   const toggleBound = toggleClaimAction.bind(null, linkId, lineId);
   const weightBound = setClaimWeightAction.bind(null, linkId, lineId);
+  const shareCountBound = setShareCountAction.bind(null, linkId, lineId);
 
   return (
     <li
@@ -117,6 +123,40 @@ export function ClaimRow({
           <span className="block text-xs text-muted-foreground">
             共 {shareCount} 份 · 每份 {formatCents(unitCents, { currency })}
           </span>
+        ) : null}
+        {isOwner ? (
+          <form
+            action={shareCountBound}
+            className="mt-0.5 flex items-center gap-1"
+          >
+            {token ? (
+              <input type="hidden" name="deviceToken" value={token} />
+            ) : null}
+            <label
+              htmlFor={`sc-${lineId}`}
+              className="text-xs text-muted-foreground"
+            >
+              拆
+            </label>
+            <input
+              id={`sc-${lineId}`}
+              name="shareCount"
+              type="number"
+              min="1"
+              max="99"
+              step="1"
+              defaultValue={shareCount}
+              className="w-12 rounded border border-input bg-background px-1 py-0.5 text-xs tabular-nums text-center"
+            />
+            <span className="text-xs text-muted-foreground">份</span>
+            <button
+              type="submit"
+              disabled={!token}
+              className="text-xs text-primary underline underline-offset-2 hover:no-underline disabled:opacity-50"
+            >
+              更新
+            </button>
+          </form>
         ) : null}
         {claimers.length > 0 ? (
           <span className="block text-xs text-muted-foreground truncate">

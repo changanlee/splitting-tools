@@ -11,7 +11,7 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { db } from "@/lib/db/client";
-import { claims } from "@/db/schema";
+import { claims, receiptLines } from "@/db/schema";
 import {
   findIdentityForToken,
   isSessionOwner,
@@ -39,6 +39,67 @@ const FRIENDLY_INVALID = "輸入內容格式不正確，請確認後再試。";
 const FRIENDLY_AUTH = "請先選擇你的身份再認領（4.1 認領入口）。";
 const FRIENDLY_NOT_FOUND = "找不到這個分帳或品項，請重新整理。";
 const FRIENDLY_UNEXPECTED = "暫時無法儲存認領，請稍後再試。";
+const FRIENDLY_OWNER_ONLY = "只有發起人可以設定份數。";
+
+/**
+ * Feature B — the session owner sets how many shares a line splits
+ * into, directly from the claim board. The receipt prints a multipack
+ * as "1x" so OCR can never know; only the payer can. Owner-only;
+ * share_count does not affect net_cents (it is purely the claim
+ * divisor), so no IRC re-fold is needed.
+ */
+export async function setShareCountAction(
+  linkId: string,
+  receiptLineId: string,
+  formData: FormData,
+): Promise<void> {
+  const rawToken = String(formData.get("deviceToken") ?? "");
+  const raw = String(formData.get("shareCount") ?? "");
+  const shareCount = Number.parseInt(raw, 10);
+  if (!Number.isInteger(shareCount) || shareCount < 1 || shareCount > 99) {
+    throw new Error(FRIENDLY_INVALID);
+  }
+  try {
+    if (!isValidLinkId(linkId)) throw new Error(FRIENDLY_NOT_FOUND);
+    if (!isValidDeviceToken(rawToken)) throw new Error(FRIENDLY_INVALID);
+    const statusRows = await db
+      .select({ status: sessions.status })
+      .from(sessions)
+      .where(eq(sessions.id, linkId))
+      .limit(1);
+    if (!statusRows[0]) throw new Error(FRIENDLY_NOT_FOUND);
+    if (isFrozen(statusRows[0].status)) throw new Error(FRIENDLY_FROZEN);
+    const owner = await isSessionOwner(linkId, rawToken);
+    if (!owner) throw new Error(FRIENDLY_OWNER_ONLY);
+    await db
+      .update(receiptLines)
+      .set({ shareCount })
+      .where(
+        and(
+          eq(receiptLines.id, receiptLineId),
+          eq(receiptLines.sessionId, linkId),
+        ),
+      );
+  } catch (e) {
+    if (
+      e instanceof Error &&
+      [
+        FRIENDLY_INVALID,
+        FRIENDLY_NOT_FOUND,
+        FRIENDLY_FROZEN,
+        FRIENDLY_OWNER_ONLY,
+      ].includes(e.message)
+    ) {
+      throw e;
+    }
+    console.error(
+      "[setShareCountAction] failed:",
+      e instanceof Error ? e.message : String(e),
+    );
+    throw new Error(FRIENDLY_UNEXPECTED);
+  }
+  revalidatePath(`/splits/${linkId}/claim`);
+}
 
 /**
  * Resolve which identity a claim write applies to.

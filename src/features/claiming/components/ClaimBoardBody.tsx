@@ -331,6 +331,7 @@ export function ClaimBoardBody({
                 weight: c.weight,
               }))}
               actingIdentityId={actingId}
+              isOwner={isOwner}
             />
           ))}
         </ol>
