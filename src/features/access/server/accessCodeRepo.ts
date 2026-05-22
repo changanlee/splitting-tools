@@ -57,6 +57,16 @@ export async function setAccessCodeEnabled(
 }
 
 /**
+ * Permanently remove a code — list cleanup. Any holder of it immediately
+ * loses access (isCodeUsable then fails the existence check). To revoke
+ * while keeping the record of who had it, use setAccessCodeEnabled(false)
+ * instead.
+ */
+export async function deleteAccessCode(code: string): Promise<void> {
+  await db.delete(accessCodes).where(eq(accessCodes.code, code));
+}
+
+/**
  * Is this code currently usable? True only if it exists AND is enabled —
  * a revoked (disabled) code fails here even if the caller still holds
  * the cookie, so revocation takes effect immediately.

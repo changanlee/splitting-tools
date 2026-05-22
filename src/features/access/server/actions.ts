@@ -17,6 +17,7 @@ import {
 } from "@/features/access/server/accessGate";
 import {
   createAccessCode,
+  deleteAccessCode,
   isCodeUsable,
   isValidCodeShape,
   setAccessCodeEnabled,
@@ -105,6 +106,25 @@ export async function toggleAccessCodeAction(
       e instanceof Error ? e.message : String(e),
     );
     throw new Error("暫時無法更新存取碼，請稍後再試。");
+  }
+  redirect("/admin");
+}
+
+/** Admin: permanently delete a code (list cleanup; holders lose access). */
+export async function deleteAccessCodeAction(
+  formData: FormData,
+): Promise<void> {
+  if (!(await isAdmin())) throw new Error(FRIENDLY_ADMIN);
+  const code = String(formData.get("code") ?? "");
+  if (!isValidCodeShape(code)) throw new Error(FRIENDLY_INVALID);
+  try {
+    await deleteAccessCode(code);
+  } catch (e) {
+    console.error(
+      "[deleteAccessCodeAction] failed:",
+      e instanceof Error ? e.message : String(e),
+    );
+    throw new Error("暫時無法刪除存取碼，請稍後再試。");
   }
   redirect("/admin");
 }

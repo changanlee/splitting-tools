@@ -16,8 +16,12 @@ export const ACCESS_COOKIE = "splitting_access";
 /** httpOnly cookie holding the admin secret. */
 export const ADMIN_COOKIE = "splitting_admin";
 
-/** Caller has a redeemed, still-enabled access code. */
+/** Caller has a redeemed, still-enabled access code — or is the admin. */
 export async function hasValidAccess(): Promise<boolean> {
+  // The admin (owner) implicitly has access — no point making the owner
+  // issue and redeem a code for themselves. Checked first so that, once
+  // logged into /admin, the owner can use the upload tool directly.
+  if (await isAdmin()) return true;
   const code = (await cookies()).get(ACCESS_COOKIE)?.value;
   if (!code) return false;
   try {

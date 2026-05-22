@@ -9,8 +9,9 @@ import { listAccessCodes } from "@/features/access/server/accessCodeRepo";
 import {
   adminLoginAction,
   createAccessCodeAction,
-  toggleAccessCodeAction,
 } from "@/features/access/server/actions";
+
+import { CodeRow } from "./CodeRow";
 
 export default async function AdminPage() {
   if (!(await isAdmin())) {
@@ -71,47 +72,18 @@ export default async function AdminPage() {
       ) : (
         <ul className="flex flex-col divide-y divide-border">
           {codes.map((c) => (
-            <li key={c.code} className="flex flex-col gap-1 py-3">
-              <div className="flex items-center justify-between gap-3">
-                <code className="select-all rounded bg-muted px-2 py-1 text-sm font-mono">
-                  {c.code}
-                </code>
-                <span
-                  className={
-                    c.enabled
-                      ? "text-xs font-medium text-emerald-600 dark:text-emerald-400"
-                      : "text-xs font-medium text-muted-foreground"
-                  }
-                >
-                  {c.enabled ? "啟用中" : "已停用"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-sm text-muted-foreground">
-                  {c.label || "（未命名）"}
-                </span>
-                <form action={toggleAccessCodeAction}>
-                  <input type="hidden" name="code" value={c.code} />
-                  <input
-                    type="hidden"
-                    name="enabled"
-                    value={String(!c.enabled)}
-                  />
-                  <button
-                    type="submit"
-                    className="text-xs text-primary underline underline-offset-2 hover:no-underline"
-                  >
-                    {c.enabled ? "停用" : "啟用"}
-                  </button>
-                </form>
-              </div>
-            </li>
+            <CodeRow
+              key={c.code}
+              code={c.code}
+              label={c.label}
+              enabled={c.enabled}
+            />
           ))}
         </ul>
       )}
 
       <p className="text-xs text-muted-foreground">
-        把「啟用中」的碼私下交給付款的人；對方在 /unlock 輸入即可使用。停繳就按「停用」。
+        按「複製」把「啟用中」的碼私下交給付款的人，對方在 /unlock 輸入即可使用。停繳按「停用」，要清掉廢碼按「刪除」。
       </p>
     </main>
   );
