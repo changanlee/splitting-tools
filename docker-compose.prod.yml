@@ -1,0 +1,32 @@
+# Production overlay. Run with BOTH files:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# It adds the Caddy reverse proxy (auto-HTTPS) in front of `web`, and a
+# restart policy on `db`. In production set WEB_PORT / DB_PORT in .env to
+# 127.0.0.1-bound values (e.g. WEB_PORT=127.0.0.1:3010) so `web` and `db`
+# are NOT reachable from the public internet — only Caddy (80/443) is.
+# See DEPLOY.md.
+services:
+  db:
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Caddy reads {$SPLIT_DOMAIN} in the Caddyfile from this var.
+      SPLIT_DOMAIN: ${SPLIT_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,13 @@
+# Caddy reverse proxy for the production deploy.
+#
+# Caddy automatically obtains + renews a Let's Encrypt TLS certificate
+# for $SPLIT_DOMAIN on first run — no manual cert handling. It fronts
+# the `web` service over the internal compose network; `web` itself is
+# never exposed to the public internet (see docker-compose.prod.yml +
+# the 127.0.0.1-bound WEB_PORT in .env).
+#
+# $SPLIT_DOMAIN is injected from the environment (docker-compose.prod.yml).
+{$SPLIT_DOMAIN} {
+	reverse_proxy web:3000
+	encode gzip
+}
