@@ -82,17 +82,28 @@ export default async function SharePage({ params }: Ctx) {
       <MessageCard {...cardProps} />
       <ShareActions shareText={shareText} shareUrl={shareUrl} />
       <a
-        href={`/splits/${linkId}/settle`}
+        href={`/splits/${linkId}/claim`}
         className="self-start rounded bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:opacity-90"
       >
-        前往結算結果 →
+        前往認領板 →
       </a>
-      <a
-        href={`/splits/${linkId}/review`}
-        className="self-start text-xs text-primary underline underline-offset-2 hover:no-underline"
-      >
-        ← 回核對閘門
-      </a>
+      <p className="-mt-1 text-xs text-muted-foreground">
+        認領板是你和朋友認領品項、設定份數的地方。你自己買的東西也在那裡認領；把上面的連結分享出去，其他人各自認領自己的。
+      </p>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1">
+        <a
+          href={`/splits/${linkId}/settle`}
+          className="text-xs text-primary underline underline-offset-2 hover:no-underline"
+        >
+          前往結算結果 →
+        </a>
+        <a
+          href={`/splits/${linkId}/review`}
+          className="text-xs text-muted-foreground underline underline-offset-2 hover:no-underline"
+        >
+          ← 回核對閘門
+        </a>
+      </div>
     </main>
   );
 }
