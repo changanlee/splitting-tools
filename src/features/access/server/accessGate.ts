@@ -34,8 +34,15 @@ export async function hasValidAccess(): Promise<boolean> {
  * it must be configured in the deploy `.env`.
  */
 export async function isAdmin(): Promise<boolean> {
+  // Read the cookie BEFORE the env check, unconditionally. ADMIN_SECRET
+  // is injected only at runtime (.env) — an env-first early return would
+  // skip cookies() at build time, Next would see no Dynamic API call and
+  // statically prerender /admin, and the cached logged-out page would
+  // never re-read the cookie (login appears to "reset"). cookies() must
+  // run on every render path to keep /admin dynamic — same as
+  // hasValidAccess() above. Do not reorder.
+  const got = (await cookies()).get(ADMIN_COOKIE)?.value;
   const secret = process.env.ADMIN_SECRET;
   if (!secret) return false;
-  const got = (await cookies()).get(ADMIN_COOKIE)?.value;
   return typeof got === "string" && got.length > 0 && got === secret;
 }
