@@ -78,6 +78,10 @@ function friendlyError(err: unknown): string {
 export function CaptureFlow() {
   const [phase, setPhase] = useState<Phase>({ k: "idle" });
   const [pages, setPages] = useState<PageItem[]>([]);
+  // The payer's own name — captured up-front (before upload) so the
+  // owner identity is created with the session, not asked later on
+  // the claim board.
+  const [ownerName, setOwnerName] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   // Latest pages for unmount cleanup (effect deps must stay []).
@@ -206,13 +210,19 @@ export function CaptureFlow() {
     let linkId = existingLinkId;
     try {
       if (!linkId) {
-        // Send our device token so the server records us as the
-        // session owner (Feature B — payer can pre-allocate claims).
+        // Send our device token + name so the server records us as the
+        // session owner AND creates our identity up-front (Feature B —
+        // payer pre-allocates; name asked on the home screen, not the
+        // claim board).
         const deviceToken = getOrCreateDeviceToken();
+        const trimmedName = ownerName.trim();
         const sRes = await fetch("/api/splits", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(deviceToken ? { deviceToken } : {}),
+          body: JSON.stringify({
+            ...(deviceToken ? { deviceToken } : {}),
+            ...(trimmedName ? { ownerName: trimmedName } : {}),
+          }),
         });
         if (!sRes.ok) throw new Error("session");
         linkId = CreateSessionResponseSchema.parse(await sRes.json()).linkId;
@@ -262,6 +272,20 @@ export function CaptureFlow() {
 
       {phase.k === "idle" && (
         <>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium">你的名字</span>
+            <span className="text-xs text-muted-foreground">
+              你是這次分帳的發起人，之後分帳會用到。
+            </span>
+            <input
+              type="text"
+              value={ownerName}
+              onChange={(e) => setOwnerName(e.target.value)}
+              maxLength={30}
+              placeholder="例：我"
+              className="mt-1 h-11 rounded-md border border-input bg-background px-3 text-base"
+            />
+          </label>
           <p className="text-sm text-muted-foreground">
             拍收據；長收據一張拍不完可以分段多拍幾張。會員卡號會在你的裝置上遮掉，不會外傳。
           </p>

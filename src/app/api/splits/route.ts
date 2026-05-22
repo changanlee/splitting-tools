@@ -3,13 +3,18 @@
  * The unguessable-link scheme is Story 3.1 (not pre-empted here).
  * Node runtime (default); not cached (POST never is).
  *
- * The request body may carry `{ deviceToken }` — the payer's device
- * token. Its sha256 is stored as the session's creator hash so the
- * payer is later recognised as the owner (Feature B pre-allocation).
+ * The request body may carry `{ deviceToken, ownerName }` — the payer's
+ * device token + name. The token's sha256 is stored as the session's
+ * creator hash (owner recognition, Feature B); when a name is also
+ * given the owner's identity is created up-front so the payer is a
+ * claimable participant from the start (no name prompt on the board).
  */
 import { createSession } from "@/features/parsing/server/jobs";
 import { isValidDeviceToken } from "@/features/identity/deviceToken";
-import { hashDeviceToken } from "@/features/identity/server/identityRepo";
+import {
+  createIdentity,
+  hashDeviceToken,
+} from "@/features/identity/server/identityRepo";
 import type {
   CreateSessionResponse,
   ErrorEnvelope,
@@ -17,26 +22,41 @@ import type {
 
 export async function POST(req: Request): Promise<Response> {
   try {
-    let creatorTokenHash: string | null = null;
+    let creatorToken: string | null = null;
+    let ownerName = "";
     try {
       const body: unknown = await req.json();
-      const token =
-        body && typeof body === "object" && "deviceToken" in body
-          ? (body as { deviceToken?: unknown }).deviceToken
-          : undefined;
-      if (isValidDeviceToken(token)) {
-        creatorTokenHash = hashDeviceToken(token);
+      if (body && typeof body === "object") {
+        const token = (body as { deviceToken?: unknown }).deviceToken;
+        if (isValidDeviceToken(token)) creatorToken = token;
+        const name = (body as { ownerName?: unknown }).ownerName;
+        if (typeof name === "string") ownerName = name.trim().slice(0, 30);
       }
     } catch {
       // No/!JSON body — fine, owner-mode just unavailable for it.
     }
+    const creatorTokenHash = creatorToken
+      ? hashDeviceToken(creatorToken)
+      : null;
     const linkId = await createSession(creatorTokenHash);
+    // Create the owner's identity up-front when a name was supplied.
+    if (creatorToken && ownerName.length > 0) {
+      try {
+        await createIdentity(linkId, ownerName, creatorToken);
+      } catch {
+        // Non-fatal — the claim board still has the name-prompt
+        // fallback if the owner identity wasn't created here.
+      }
+    }
     const body: CreateSessionResponse = { linkId };
     return Response.json(body, { status: 201 });
   } catch {
     // NFR-R1: never leak the raw error.
     const body: ErrorEnvelope = {
-      error: { code: "SESSION_CREATE_FAILED", message: "暫時無法開始，請稍後再試。" },
+      error: {
+        code: "SESSION_CREATE_FAILED",
+        message: "暫時無法開始，請稍後再試。",
+      },
     };
     return Response.json(body, { status: 502 });
   }
