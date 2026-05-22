@@ -1,15 +1,16 @@
 "use client";
 
 /**
- * Story 4.2 — "是不是你" identity picker (FR21/FR22).
+ * Story 4.2 — identity entry (FR21/FR22).
  *
- * Client island because we need the device-token from localStorage
- * in the form payload. Loads the token on mount and stamps it into
- * a hidden field on every submit. If there are existing identities,
- * the picker shows them as "pick me" buttons; either way the user
- * can also create a new name.
+ * Client island: the device-token from localStorage must ride in the
+ * form payload. A fresh visitor just types their OWN name — the
+ * "pick a name I used before" re-bind path (for a returning user who
+ * lost their device binding, e.g. switched browser) is tucked behind a
+ * toggle. Newcomers are never shown — nor tempted to tap — other
+ * people's identities, including the owner's.
  */
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { getOrCreateDeviceToken } from "@/features/identity/deviceToken";
 import { pickOrCreateIdentityAction } from "@/features/identity/server/actions";
@@ -48,9 +49,11 @@ export function IdentityPicker({ linkId, existing }: Props) {
     getTokenSnapshot,
     getServerTokenSnapshot,
   );
-  // Note: the only error path is localStorage refusing to set/read
-  // (private mode etc.). `getOrCreateDeviceToken` swallows the error
-  // and returns null; we surface a friendly hint when that happens.
+  const [showRebind, setShowRebind] = useState(false);
+
+  // The only error path is localStorage refusing to set/read (private
+  // mode etc.). `getOrCreateDeviceToken` swallows the error and returns
+  // null; surface a friendly hint when that happens.
   const localStorageBlocked =
     token === null && typeof window !== "undefined";
 
@@ -71,41 +74,12 @@ export function IdentityPicker({ linkId, existing }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      {existing.length > 0 ? (
-        <section
-          aria-label="是不是你？"
-          className="flex flex-col gap-2 border-b border-border pb-4"
-        >
-          <h2 className="text-sm font-semibold">是不是你？</h2>
-          <p className="text-xs text-muted-foreground">
-            選取你之前用過的名字（會綁到這個裝置）。
-          </p>
-          <ul className="flex flex-col gap-2">
-            {existing.map((i) => (
-              <li key={i.id}>
-                <form action={bound}>
-                  <input type="hidden" name="mode" value="pick" />
-                  <input type="hidden" name="identityId" value={i.id} />
-                  <input type="hidden" name="deviceToken" value={token} />
-                  <button
-                    type="submit"
-                    className="w-full rounded border border-input bg-background px-3 py-2 text-sm text-left hover:bg-accent"
-                  >
-                    我是 <span className="font-medium">{i.name}</span>
-                  </button>
-                </form>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-      <section
-        aria-label="第一次認領"
-        className="flex flex-col gap-2"
-      >
-        <h2 className="text-sm font-semibold">
-          {existing.length > 0 ? "或：第一次來" : "請告訴我們你的名字"}
-        </h2>
+      {/* Primary path — every fresh visitor just names themselves. */}
+      <section aria-label="輸入你的名字" className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold">請輸入你的名字</h2>
+        <p className="text-xs text-muted-foreground">
+          這是你在這次分帳裡的名字，你認領的品項會記在這個名字下。
+        </p>
         <form action={bound} className="flex flex-col gap-2">
           <input type="hidden" name="mode" value="create" />
           <input type="hidden" name="deviceToken" value={token} />
@@ -127,6 +101,54 @@ export function IdentityPicker({ linkId, existing }: Props) {
           </button>
         </form>
       </section>
+
+      {/* Re-bind path — only for someone who joined before on another
+          browser. Hidden by default so newcomers never see, or
+          mis-tap, other people's names. */}
+      {existing.length > 0 ? (
+        <section
+          aria-label="選回之前用過的名字"
+          className="flex flex-col gap-2 border-t border-border pt-4"
+        >
+          {showRebind ? (
+            <>
+              <h2 className="text-sm font-semibold">選回你之前用過的名字</h2>
+              <p className="text-xs text-muted-foreground">
+                只有你「之前加入過、後來換了瀏覽器」才需要這個。選錯人會把品項記到對方名下。
+              </p>
+              <ul className="flex flex-col gap-2">
+                {existing.map((i) => (
+                  <li key={i.id}>
+                    <form action={bound}>
+                      <input type="hidden" name="mode" value="pick" />
+                      <input type="hidden" name="identityId" value={i.id} />
+                      <input
+                        type="hidden"
+                        name="deviceToken"
+                        value={token}
+                      />
+                      <button
+                        type="submit"
+                        className="w-full rounded border border-input bg-background px-3 py-2 text-sm text-left hover:bg-accent"
+                      >
+                        我是 <span className="font-medium">{i.name}</span>
+                      </button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowRebind(true)}
+              className="self-start text-xs text-muted-foreground underline underline-offset-2 hover:no-underline"
+            >
+              我之前已經加入過、要選回原本的名字
+            </button>
+          )}
+        </section>
+      ) : null}
     </div>
   );
 }
