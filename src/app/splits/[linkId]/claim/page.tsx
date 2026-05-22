@@ -11,11 +11,16 @@
  */
 import { notFound } from "next/navigation";
 
+import { eq } from "drizzle-orm";
+
+import { db } from "@/lib/db/client";
+import { sessions } from "@/db/schema";
 import { ClaimPageBody } from "@/features/claiming/components/ClaimPageBody";
 import { listClaims } from "@/features/claiming/server/claimRepo";
 import { listIdentities } from "@/features/identity/server/identityRepo";
 import { getReconciliationSummary } from "@/features/reconciliation/server/summary";
 import { sessionExists } from "@/features/parsing/server/jobs";
+import { isFrozen } from "@/features/settlement/freeze";
 import { isValidLinkId } from "@/lib/linkId";
 
 interface Ctx {
@@ -30,6 +35,32 @@ export default async function ClaimPage({ params, searchParams }: Ctx) {
 
   const exists = await sessionExists(linkId).catch(() => false);
   if (!exists) notFound();
+
+  // Story 5.5 — a finalized split is read-only. Show a clear notice
+  // instead of the claim board, so nobody lands on controls whose
+  // server action would reject with FRIENDLY_FROZEN and surface as a
+  // raw 500 ("This page couldn't load").
+  const statusRow = await db
+    .select({ status: sessions.status })
+    .from(sessions)
+    .where(eq(sessions.id, linkId))
+    .limit(1);
+  if (statusRow[0] && isFrozen(statusRow[0].status)) {
+    return (
+      <main className="min-h-dvh max-w-md mx-auto flex flex-col gap-4 px-4 py-10">
+        <h1 className="text-lg font-semibold">這筆分帳已定案</h1>
+        <p className="text-sm text-muted-foreground">
+          結算完成後分帳就鎖定了，無法再認領或修改。要重新分，請拍一張新收據開另一筆分帳。
+        </p>
+        <a
+          href={`/splits/${linkId}/settle`}
+          className="self-start rounded bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+        >
+          查看結算結果 →
+        </a>
+      </main>
+    );
+  }
 
   const [identitiesAll, claimsAll, summary] = await Promise.all([
     listIdentities(linkId).catch(() => []),
