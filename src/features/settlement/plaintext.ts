@@ -16,8 +16,10 @@ export interface PlaintextInput {
   perIdentity: {
     name: string;
     cents: number;
-    /** What this person claimed — listed under their line. */
-    items?: { description: string; cents: number }[];
+    /** What this person claimed — listed under their line. `weight` is
+     *  the share count they took on that line; only rendered when ≥ 2
+     *  (default 1 = a single share, leave silent to avoid clutter). */
+    items?: { description: string; cents: number; weight?: number }[];
   }[];
   pendingCents: number;
   orphanIrcCents: number;
@@ -37,7 +39,8 @@ export function buildSettlementText(args: PlaintextInput): string {
     for (const p of args.perIdentity) {
       lines.push(`${p.name}　${fmt(p.cents)}`);
       for (const it of p.items ?? []) {
-        lines.push(`  ・${it.description} ${fmt(it.cents)}`);
+        const qty = (it.weight ?? 1) >= 2 ? ` ×${it.weight}` : "";
+        lines.push(`  ・${it.description}${qty} ${fmt(it.cents)}`);
       }
     }
   }

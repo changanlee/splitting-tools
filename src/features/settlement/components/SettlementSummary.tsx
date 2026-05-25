@@ -10,7 +10,7 @@ interface Props {
     identityId: string;
     name: string;
     cents: number;
-    items: { description: string; cents: number }[];
+    items: { description: string; cents: number; weight: number }[];
   }[];
   pendingCents: number;
   orphanIrcCents: number;
@@ -71,7 +71,14 @@ export function SettlementSummary({
                       key={i}
                       className="flex items-center justify-between gap-3"
                     >
-                      <span className="truncate">{it.description}</span>
+                      <span className="truncate">
+                        {it.description}
+                        {it.weight >= 2 ? (
+                          <span className="ml-1 tabular-nums">
+                            ×{it.weight}
+                          </span>
+                        ) : null}
+                      </span>
                       <span className="tabular-nums shrink-0">
                         {fmt(it.cents)}
                       </span>

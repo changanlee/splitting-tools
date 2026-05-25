@@ -23,12 +23,14 @@ export interface SettlementView {
   /** ISO 4217 stamped by the parser; null when unknown. */
   currency: string | null;
   /** Ordered (largest amount first) — same iteration in plaintext export.
-   *  `items` lists what that person claimed (description + their cents). */
+   *  `items` lists what that person claimed (description + their cents +
+   *  `weight` = how many shares they took, surfaced when ≥ 2 so the
+   *  reader can see why the price is higher than the unit). */
   perIdentity: {
     identityId: string;
     name: string;
     cents: number;
-    items: { description: string; cents: number }[];
+    items: { description: string; cents: number; weight: number }[];
   }[];
   pendingCents: number;
   orphanIrcCents: number;
@@ -95,17 +97,24 @@ export async function getSettlementView(
   const parsedSumCents = lineRows.reduce((a, l) => a + l.grossCents, 0);
 
   // Per-identity item breakdown — group settle()'s per-line allocations
-  // and resolve each line's description.
+  // and resolve each line's description + this claimer's share weight
+  // (looked up from claimRows; settle()'s perLine doesn't carry weight).
   const descById = new Map(lineRows.map((l) => [l.id, l.description] as const));
+  const weightByLineIdentity = new Map(
+    claimRows.map(
+      (c) => [`${c.receiptLineId}\x00${c.identityId}`, c.weight] as const,
+    ),
+  );
   const itemsByIdentity = new Map<
     string,
-    { description: string; cents: number }[]
+    { description: string; cents: number; weight: number }[]
   >();
   for (const p of r.perLine) {
     const list = itemsByIdentity.get(p.identityId) ?? [];
     list.push({
       description: descById.get(p.lineId) ?? p.lineId,
       cents: p.cents,
+      weight: weightByLineIdentity.get(`${p.lineId}\x00${p.identityId}`) ?? 1,
     });
     itemsByIdentity.set(p.identityId, list);
   }
