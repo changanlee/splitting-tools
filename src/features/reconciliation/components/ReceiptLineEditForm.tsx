@@ -6,6 +6,7 @@
  * the same expanded row. "取消" is a plain GET link back to /review
  * (drops the `?edit=` query).
  */
+import { QuantityStepper } from "@/components/ui/quantity-stepper";
 import {
   deleteLineAction,
   editLineAction,
@@ -57,15 +58,14 @@ export function ReceiptLineEditForm({ linkId, line }: Props) {
         <div className="flex gap-2">
           <label className="flex flex-col gap-1 flex-1">
             <span className="text-xs text-muted-foreground">數量（收據）</span>
-            <input
+            <QuantityStepper
               name="qty"
-              type="number"
-              min="1"
-              step="1"
-              inputMode="numeric"
+              min={1}
+              max={99}
               defaultValue={line.qty}
+              size="sm"
               required
-              className="rounded border border-input bg-background px-2 py-1.5 text-sm tabular-nums"
+              ariaLabel="數量（收據）"
             />
           </label>
           <label className="flex flex-col gap-1 flex-1">
@@ -84,15 +84,14 @@ export function ReceiptLineEditForm({ linkId, line }: Props) {
           <span className="text-xs text-muted-foreground">
             份數（拆帳用 — 這行要分成幾份給人認領）
           </span>
-          <input
+          <QuantityStepper
             name="shareCount"
-            type="number"
-            min="1"
-            step="1"
-            inputMode="numeric"
+            min={1}
+            max={99}
             defaultValue={line.shareCount}
+            size="sm"
             required
-            className="rounded border border-input bg-background px-2 py-1.5 text-sm tabular-nums"
+            ariaLabel="份數（拆帳用）"
           />
         </label>
         <div className="flex items-center gap-2 pt-1">

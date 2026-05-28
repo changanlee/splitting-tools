@@ -15,6 +15,7 @@ import {
   setShareCountAction,
   toggleClaimAction,
 } from "@/features/claiming/server/actions";
+import { QuantityStepper } from "@/components/ui/quantity-stepper";
 import { getOrCreateDeviceToken } from "@/features/identity/deviceToken";
 import { identityColor } from "@/features/identity/identityColor";
 import { formatCents } from "@/features/reconciliation/lib/formatCents";
@@ -155,24 +156,28 @@ export function ClaimRow({
             >
               拆
             </label>
-            <input
+            <QuantityStepper
               id={`sc-${lineId}`}
               name="shareCount"
-              type="number"
-              min="1"
-              max="99"
-              step="1"
+              min={1}
+              max={99}
               defaultValue={shareCount}
-              className="w-12 rounded border border-input bg-background px-1 py-0.5 text-xs tabular-nums text-center"
+              size="xs"
+              disabled={!token}
+              autoSubmit
+              ariaLabel="拆幾份"
             />
             <span className="text-xs text-muted-foreground">份</span>
-            <button
-              type="submit"
-              disabled={!token}
-              className="text-xs text-primary underline underline-offset-2 hover:no-underline disabled:opacity-50"
-            >
-              更新
-            </button>
+            {/* Plain <noscript> fallback — if JS is off, stepper can't
+                auto-submit so we still expose a submit button. */}
+            <noscript>
+              <button
+                type="submit"
+                className="text-xs text-primary underline underline-offset-2"
+              >
+                更新
+              </button>
+            </noscript>
           </form>
         ) : null}
         {claimers.length > 0 ? (
@@ -218,23 +223,25 @@ export function ClaimRow({
           >
             {multiShare ? "拿幾份" : "我的份額"}
           </label>
-          <input
+          <QuantityStepper
             id={`w-${lineId}`}
             name="weight"
-            type="number"
-            min="1"
-            max="1000"
-            step="1"
+            min={1}
+            max={1000}
             defaultValue={myWeight}
-            className="w-12 rounded border border-input bg-background px-1 py-0.5 text-xs tabular-nums text-center"
-          />
-          <button
-            type="submit"
+            size="xs"
             disabled={!token}
-            className="text-xs text-primary underline underline-offset-2 hover:no-underline disabled:opacity-50"
-          >
-            更新
-          </button>
+            autoSubmit
+            ariaLabel={multiShare ? "拿幾份" : "我的份額"}
+          />
+          <noscript>
+            <button
+              type="submit"
+              className="text-xs text-primary underline underline-offset-2"
+            >
+              更新
+            </button>
+          </noscript>
         </form>
       ) : null}
       <span className="tabular-nums text-sm font-semibold shrink-0">

@@ -2,6 +2,7 @@
  * Story 2.3 — add a new product line (FR11). Collapsed by default via
  * native <details>; expands to a server-action form. No client JS.
  */
+import { QuantityStepper } from "@/components/ui/quantity-stepper";
 import { addLineAction } from "@/features/reconciliation/server/actions";
 import { CURRENCY_PREFIX } from "@/features/reconciliation/lib/formatCents";
 
@@ -34,15 +35,14 @@ export function AddLineForm({ linkId, currency }: Props) {
         <div className="flex gap-2">
           <label className="flex flex-col gap-1 flex-1">
             <span className="text-xs text-muted-foreground">數量</span>
-            <input
+            <QuantityStepper
               name="qty"
-              type="number"
-              min="1"
-              step="1"
-              defaultValue="1"
-              inputMode="numeric"
+              min={1}
+              max={99}
+              defaultValue={1}
+              size="sm"
               required
-              className="rounded border border-input bg-background px-2 py-1.5 text-sm tabular-nums"
+              ariaLabel="數量"
             />
           </label>
           <label className="flex flex-col gap-1 flex-1">
