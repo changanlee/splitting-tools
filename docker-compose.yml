@@ -5,6 +5,12 @@
 services:
   db:
     image: postgres:16
+    # db MUST share its dependents' restart policy. web/worker are
+    # restart: unless-stopped, so a db that stays down (Docker Desktop
+    # restart / mac sleep / manual stop) leaves the worker crash-looping on
+    # `getaddrinfo ENOTFOUND db` — log flood + 100% CPU. Symmetric restart
+    # removes that asymmetry (prod/colocate overlays already set this).
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
