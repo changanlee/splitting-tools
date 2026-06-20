@@ -120,7 +120,17 @@ export function ReceiptLineRow({
         </span>
       ) : null}
       <span className="flex-1 min-w-0">
-        <span className="block text-sm font-medium">{line.description}</span>
+        <span className="block text-sm font-medium">
+          {line.description}
+          {line.descriptionVerified ? (
+            <span
+              className="ml-1.5 inline-flex items-center rounded-sm bg-emerald-100 px-1 py-0.5 align-middle text-[10px] font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+              title="此外語品名已透過網路查證"
+            >
+              ✓ 已查證
+            </span>
+          ) : null}
+        </span>
         {isSuspicious ? (
           <span className="block text-xs text-amber-700 dark:text-amber-300 font-medium">
             可疑（{suspicious!.flags.join("、")}）

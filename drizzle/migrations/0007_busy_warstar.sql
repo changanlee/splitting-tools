@@ -1,0 +1,1 @@
+ALTER TABLE "receipt_lines" ADD COLUMN "description_verified" boolean DEFAULT false NOT NULL;

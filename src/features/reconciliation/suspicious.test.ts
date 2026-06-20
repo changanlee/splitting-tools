@@ -14,6 +14,7 @@ const product = (
     lineNo: overrides.lineNo,
     description: "巧克力牛乳",
     rawText: null,
+    descriptionVerified: false,
     qty: 1,
     shareCount: 1,
     grossCents: 9990,

@@ -50,6 +50,13 @@
       "when": 1779434961737,
       "tag": "0006_ancient_the_initiative",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781963323130,
+      "tag": "0007_busy_warstar",
+      "breakpoints": true
     }
   ]
 }

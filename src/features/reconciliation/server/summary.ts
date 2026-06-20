@@ -17,6 +17,8 @@ export interface ReceiptLineView {
   lineNo: number;
   description: string;
   rawText: string | null;
+  /** True when `description` was web-verified (foreign-receipt Pass 2). */
+  descriptionVerified: boolean;
   qty: number;
   /** How many shares this line splits into for claiming. */
   shareCount: number;
@@ -68,6 +70,7 @@ export async function getReconciliationSummary(
       lineNo: receiptLines.lineNo,
       description: receiptLines.description,
       rawText: receiptLines.rawText,
+      descriptionVerified: receiptLines.descriptionVerified,
       qty: receiptLines.qty,
       shareCount: receiptLines.shareCount,
       grossCents: receiptLines.grossCents,

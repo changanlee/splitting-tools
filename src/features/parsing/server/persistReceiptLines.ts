@@ -27,6 +27,9 @@ export async function persistReceiptLines(
    *  untouched (don't overwrite a previously-stamped good value with
    *  a worse "unknown" from a retry). */
   currency?: string,
+  /** 1-based lineNos whose `description` was web-verified (Pass 2). Empty
+   *  / undefined → every line persists as unverified (false). */
+  verifiedLineNos?: Set<number>,
 ): Promise<void> {
   // Assign stable ids; map a parent's lineNo → its row id so an IRC
   // line's `ircAttributedTo` (a lineNo) becomes the parent's row id.
@@ -61,6 +64,7 @@ export async function persistReceiptLines(
       lineNo: l.lineNo,
       description: l.description,
       rawText: l.rawText ?? null,
+      descriptionVerified: verifiedLineNos?.has(l.lineNo) ?? false,
       qty: l.qty,
       // Seed shareCount from the receipt qty — a "3x milk" line splits
       // 3 ways by default; single items split 1 way (whole line). The

@@ -27,7 +27,13 @@ import {
   markJobStatus,
 } from "@/features/parsing/server/jobs";
 import { parseReceiptImages } from "@/lib/llm/visionAdapter";
+import { verifyTranslations } from "@/lib/llm/verifyTranslations";
 import { attributeIrc } from "@/features/parsing/irc";
+import {
+  mergeVerifiedDescriptions,
+  pickLowConfidenceLines,
+  verifiedLineNos as toVerifiedLineNos,
+} from "@/features/parsing/verify";
 import { persistReceiptLines } from "@/features/parsing/server/persistReceiptLines";
 
 const FRIENDLY_UNEXPECTED =
@@ -72,6 +78,31 @@ export async function registerParseWorker(boss: PgBoss): Promise<void> {
             // ParsedReceiptSchema.parse inside visionAdapter still
             // re-validates the LLM payload shape (NFR-R1).
             output = outcome.receipt; // pg-boss job output (W-1-4-3)
+
+            // 2026-06-20 Pass 2: web-verify the Traditional-Chinese names
+            // the vision parse flagged low-confidence (foreign receipts).
+            // Best-effort — verifyTranslations never throws and returns []
+            // on any failure / no key, so a verify miss silently keeps the
+            // Pass-1 translations and NEVER blocks the parse (NFR-R2). Only
+            // runs when ≥1 low-confidence line exists (zero cost otherwise).
+            let receiptForPersist = outcome.receipt;
+            let verifiedNos: Set<number> | undefined;
+            const lowConf = pickLowConfidenceLines(outcome.receipt);
+            if (lowConf.length > 0) {
+              const verified = await verifyTranslations(
+                lowConf,
+                data.sessionId,
+              );
+              if (verified.length > 0) {
+                const merged = mergeVerifiedDescriptions(
+                  outcome.receipt,
+                  verified,
+                );
+                receiptForPersist = merged.receipt;
+                verifiedNos = toVerifiedLineNos(merged.verifiedIndices);
+              }
+            }
+
             // Story 1.5: IRC attribution + receipt_lines persistence in
             // the SAME success path (W-1-4-3 hand-off; no cross-process
             // pg-boss-output read). A DB blip must NOT rethrow (pg-boss
@@ -79,12 +110,13 @@ export async function registerParseWorker(boss: PgBoss): Promise<void> {
             // and must still leave the payer un-deadlocked (NFR-R2).
             let persisted = false;
             try {
-              const attributed = attributeIrc(outcome.receipt);
+              const attributed = attributeIrc(receiptForPersist);
               await persistReceiptLines(
                 data.jobId,
                 data.sessionId,
                 attributed,
-                outcome.receipt.currency,
+                receiptForPersist.currency,
+                verifiedNos,
               );
               persisted = true;
               await markJobStatus(
