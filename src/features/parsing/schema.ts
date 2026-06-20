@@ -151,6 +151,16 @@ export const ReceiptLineSchema = z.object({
   rawText: z.string().optional(),
   qty: z.number().int().positive(),
   amountCents: z.number().int(),
+  /**
+   * The parser's self-assessed confidence that `description` is the
+   * CORRECT/common Traditional-Chinese name for this item (2026-06-20
+   * foreign-receipt feature). `"low"` = a transliteration guess / rare
+   * brand / unsure official zh-TW name → eligible for the web-verify
+   * pass (verifyTranslations). `"high"` (or absent, for back-compat with
+   * pre-feature rows / the friendly-degrade path) = trusted as-is, never
+   * spends a web search. Transient: drives Pass 2 only, NOT persisted.
+   */
+  descriptionConfidence: z.enum(["high", "low"]).optional(),
 });
 export type ReceiptLine = z.infer<typeof ReceiptLineSchema>;
 
@@ -202,8 +212,14 @@ export const PARSED_RECEIPT_JSON_SCHEMA = {
           rawText: { type: "string" },
           qty: { type: "integer" },
           amountCents: { type: "integer" },
+          descriptionConfidence: {
+            type: "string",
+            enum: ["high", "low"],
+            description:
+              "\"low\" if `description` is a translation/transliteration guess or an uncertain official Traditional-Chinese product name (eligible for web verification); \"high\" for confident or already-Chinese names.",
+          },
         },
-        required: ["description", "qty", "amountCents"],
+        required: ["description", "qty", "amountCents", "descriptionConfidence"],
       },
     },
   },

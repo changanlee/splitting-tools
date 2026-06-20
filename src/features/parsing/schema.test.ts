@@ -159,6 +159,31 @@ describe("ReceiptLineSchema / ParsedReceiptSchema (Story 1.4 AC3)", () => {
     ).toThrow();
   });
 
+  it("accepts an optional descriptionConfidence enum, rejects a bad value", () => {
+    expect(
+      ReceiptLineSchema.parse({
+        description: "農心 辛拉麵",
+        rawText: "농심 신라면",
+        qty: 1,
+        amountCents: 4580,
+        descriptionConfidence: "low",
+      }).descriptionConfidence,
+    ).toBe("low");
+    // Absent is valid (back-compat: pre-feature rows / degrade path).
+    expect(
+      ReceiptLineSchema.parse({ description: "X", qty: 1, amountCents: 100 })
+        .descriptionConfidence,
+    ).toBeUndefined();
+    expect(() =>
+      ReceiptLineSchema.parse({
+        description: "X",
+        qty: 1,
+        amountCents: 100,
+        descriptionConfidence: "maybe",
+      }),
+    ).toThrow();
+  });
+
   it("ParsedReceiptSchema validates a lines array and rejects a bad line", () => {
     expect(
       ParsedReceiptSchema.parse({

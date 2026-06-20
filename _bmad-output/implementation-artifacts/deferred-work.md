@@ -12,6 +12,44 @@
 
 ---
 
+## W-VERIFY-1 — Foreign-receipt web-verify pass: live-LLM + plugin migration
+
+- **Status:** OPEN
+- **Priority:** P1
+- **Story:** 2026-06-20 foreign-receipt feature (Pass 2 — `verifyTranslations`)
+- **Gap:** Residuals on the new web-verify boundary:
+  1. **External path PROVEN (2026-06-21); full worker→DB integration still
+     local-untested.** A real OpenRouter call (Sonnet 4.6 + `web` plugin +
+     the exact `VERIFY_JSON_SCHEMA`, valid key sourced from the VPS
+     `/root/splitting-tools/.env`) returned schema-valid results for the
+     3 hardest Korean lines — and web search materially corrected one
+     (「종가 볶음투어」→「宗家 炒泡菜旅行組 400g（80g×5入）」). Cost
+     $0.0168 / 3 lines. So the web plugin → JSON → Zod path is confirmed.
+     What is still NOT exercised locally: the END-TO-END worker run
+     (`parseWorker` → `verifyTranslations` → `mergeVerifiedDescriptions`
+     → `persistReceiptLines` → `description_verified`), which needs the
+     DB + worker up (docker compose). The pure merge/persist logic is
+     unit-covered (`verify.test.ts`); only the wiring is unproven.
+  2. **OpenRouter `web` plugin is deprecated** in favour of the
+     `openrouter:web_search` server tool. The plugin still works and is
+     single-request; migrate before it is retired. Pin/model unchanged
+     (`anthropic/claude-sonnet-4.6` + plugin), see registry §5.
+  3. **Verify call is not separately budget-gated.** It runs post-charge
+     in the worker, bounded by `MAX_VERIFY_LINES=15` and "only when ≥1
+     low-confidence line", and is logged to `llm_costs`. OBSERVED live
+     cost (2026-06-21, 3 lines each): KO $0.017, JP $0.099 — the spread is
+     web-search context size (JP pulled 21.5K prompt tokens). So a single
+     verify call can reach ~$0.10; consider lowering `max_results` (5→3)
+     or trimming injected context if `llm_costs` shows this adding up. A
+     per-session verify-budget is deferred until usage data warrants it.
+- **Reason for defer:** (1)/(2) need a real key / upstream timeline; (3)
+  is a deliberate proportionate-cost tradeoff (LLM non-negotiable #2/#7
+  satisfied by the cap + cost log, not yet by a hard gate).
+- **Trigger to resolve:** first real-key deploy smoke (1+2); OpenRouter
+  plugin deprecation notice (2); any verify-cost anomaly in `llm_costs` (3).
+
+---
+
 ## W-1-1-1 — Story 1.1 `docker compose up` runtime re-verify
 
 - **Status:** RESOLVED (2026-05-20 02:33, by retry #5). The

@@ -144,6 +144,13 @@ export const receiptLines = pgTable(
     lineNo: integer("line_no").notNull(),
     description: text("description").notNull(),
     rawText: text("raw_text"),
+    // 2026-06-20 foreign-receipt feature: true when `description` was a
+    // low-confidence Pass-1 translation that the web-verify pass (Pass 2)
+    // confirmed/corrected. Drives the 「✓ 已查證」UI badge. Defaults false
+    // — back-compat for pre-feature rows and the friendly-degrade path.
+    descriptionVerified: boolean("description_verified")
+      .notNull()
+      .default(false),
     // Receipt-printed quantity (OCR truth, for reconciliation). NOT a
     // splitting concept — see `shareCount`.
     qty: integer("qty").notNull(),

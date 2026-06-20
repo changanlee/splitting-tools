@@ -57,5 +57,13 @@ id). Non-LLM diffs auto-skip this hunter.
 - **1.4 vision LLM parse (LLM-Ops wrapper)** — the core LLM story; items
   1,2,4,5 ✅ on-spec here; 3 ⏸ inherited 1.3.
 - **1.7 parse endpoint budget** — item 7 ✅ on-spec; 2 reinforced.
+- **foreign-receipt Pass 2 (2026-06-20) — `verifyTranslations`** — the
+  SECOND LLM boundary (web-verifies low-confidence foreign-item names).
+  Items 1 (retry/backoff, PRIMARY-only — best-effort, no haiku tier),
+  2/5 (`llm_costs` via the shared `recordLlmCost`), 4 (returns `[]` on any
+  failure → keeps Pass-1 names, never blocks; NFR-R2), 5 (Zod
+  `VerifiedTranslationSchema`) ✅ on-spec. Same model pin as 1.4 +
+  OpenRouter `web` plugin (no new pin). Live run + plugin migration +
+  verify-budget tracked in deferred-work **W-VERIFY-1**.
 - All other epics (2–6) — non-LLM unless a future story adds an LLM call;
   then this checklist applies.

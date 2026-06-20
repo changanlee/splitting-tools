@@ -32,17 +32,13 @@
  * The "cache / last-good" degradation tier is not implemented (no
  * prior-good store exists yet) → deferred W-1-4-2 (non-silent).
  */
-import { randomUUID } from "node:crypto";
-
-import { db } from "@/lib/db/client";
-import { llmCosts } from "@/db/schema";
 import {
   MAX_PARSE_PAGES,
   PARSED_RECEIPT_JSON_SCHEMA,
   ParsedReceiptSchema,
   type ParsedReceipt,
 } from "@/features/parsing/schema";
-import { computeCostUsd } from "@/lib/llm/cost";
+import { recordLlmCost } from "@/lib/llm/costLog";
 import { DEGRADATION_MODELS } from "@/lib/llm/models";
 import {
   backoffWithJitterMs,
@@ -59,8 +55,13 @@ const SYSTEM_INSTRUCTION =
   "你是收據解析器。輸入是一張或多張同一張收據的連續分頁影像（已遮蔽會員卡號），順序為收據由上到下。" +
   "輸出兩件事：" +
   "(1) currency＝該收據幣別的 ISO 4217 三字母代碼（如 CNY、TWD、USD、JPY、HKD、KRW、EUR、GBP 等）。從幣別符號（¥/NT$/US$/￥/HK$/₩/€/£）、店家所在國家、地址或語言判讀；無法判讀則回空字串 \"\"。不要亂猜。" +
-  "(2) lines＝逐行抽出每個品項：description＝把天書縮寫還原成可辨識的繁體中文/原文品名；" +
-  "rawText＝該行原始文字（保留縮寫，供後續對帳追溯）；qty＝數量（正整數）；" +
+  "(2) lines＝逐行抽出每個品項：" +
+  "description＝一律輸出自然、好懂的【繁體中文】品名（這是要給使用者分帳看的）。" +
+  "若品項是外語（韓文／日文／英文／泰文等），請翻成道地繁體中文；品牌名保留可辨識（例：농심→農心、신라면→辛拉麵、오레오→Oreo／奧利奧、새우깡→蝦條）。不要原封不動留外文。把天書縮寫也還原成可辨識品名。" +
+  "rawText＝一律保留該行【原始文字】（含外語原文與縮寫，逐字照抄），供後續對帳追溯。" +
+  "descriptionConfidence＝你對「description 是否為正確／通用的繁中譯名」的把握："+
+  "音譯猜測、罕見品牌、無法確定官方譯名→\"low\"；常見品項、英文好譯、或本來就是中文收據→\"high\"。寧可標 low 也不要亂猜當 high。" +
+  "qty＝數量（正整數）；" +
   "amountCents＝該行金額的「整數分／角」（例如 16.50 元＝1650；嚴禁小數）。" +
   "IRC／折扣等負項視為一般負額品項照常輸出（不要在此歸屬母品項）。" +
   "只輸出符合給定 JSON schema 的結果，不要加任何解釋文字。";
@@ -104,43 +105,6 @@ interface OpenRouterResponse {
     /** OpenRouter-specific: final USD cost incl. markup. */
     cost?: number | null;
   };
-}
-
-/** Record one attempt to llm_costs (NFR-L2/L3). Best-effort —
- *  telemetry must never mask the parse outcome. */
-async function recordCost(
-  ctx: ParseContext,
-  model: string,
-  usage: OpenRouterResponse["usage"] | null,
-  latencyMs: number,
-  success: boolean,
-): Promise<void> {
-  try {
-    const u = usage ?? {};
-    const liveCost =
-      typeof u.cost === "number" && Number.isFinite(u.cost) && u.cost >= 0
-        ? u.cost
-        : null;
-    const costUsd =
-      liveCost !== null
-        ? liveCost
-        : computeCostUsd(model, {
-            inputTokens: u.prompt_tokens ?? 0,
-            outputTokens: u.completion_tokens ?? 0,
-          });
-    await db.insert(llmCosts).values({
-      sessionId: ctx.sessionId,
-      requestId: randomUUID(),
-      model,
-      promptTokens: u.prompt_tokens ?? 0,
-      completionTokens: u.completion_tokens ?? 0,
-      latencyMs,
-      costUsd: costUsd.toFixed(6),
-      success,
-    });
-  } catch (e) {
-    console.error("[visionAdapter] llm_costs write failed:", e);
-  }
 }
 
 /**
@@ -231,7 +195,7 @@ export async function parseReceiptImages(
         // Read+discard body to free the connection; we log only the
         // status (NFR-S3 — never raw content).
         await resp.text().catch(() => "");
-        await recordCost(ctx, model, null, latency, false);
+        await recordLlmCost(ctx.sessionId, model, null, latency, false);
         if (status === 401 || status === 403) {
           console.error(
             `[visionAdapter] fatal auth status=${status} — aborting chain`,
@@ -264,7 +228,7 @@ export async function parseReceiptImages(
         console.warn(
           `[visionAdapter] non-stop finish_reason=${finish} model=${model}`,
         );
-        await recordCost(ctx, model, body.usage ?? null, latency, false);
+        await recordLlmCost(ctx.sessionId, model, body.usage ?? null, latency, false);
         continue;
       }
 
@@ -276,18 +240,18 @@ export async function parseReceiptImages(
         console.warn(
           `[visionAdapter] response not schema-valid model=${model} textLen=${raw.length}`,
         );
-        await recordCost(ctx, model, body.usage ?? null, latency, false);
+        await recordLlmCost(ctx.sessionId, model, body.usage ?? null, latency, false);
         continue;
       }
 
-      await recordCost(ctx, model, body.usage ?? null, latency, true);
+      await recordLlmCost(ctx.sessionId, model, body.usage ?? null, latency, true);
       const degraded = model !== DEGRADATION_MODELS[0];
       return { kind: "parsed", receipt: parsed, degraded };
     } catch (err) {
       // Network-level error (DNS / ECONNRESET / fetch timeout) — no
       // HTTP status; treat as retryable.
       const latency = Date.now() - startedAt;
-      await recordCost(ctx, model, null, latency, false);
+      await recordLlmCost(ctx.sessionId, model, null, latency, false);
       console.warn(
         "[visionAdapter] network error:",
         err instanceof Error ? err.message : String(err),
