@@ -10,20 +10,16 @@
  * payer's escape hatch.
  */
 import { setPrintedTotalAction } from "@/features/reconciliation/server/actions";
-import { CURRENCY_PREFIX } from "@/features/reconciliation/lib/formatCents";
+import {
+  CURRENCY_PREFIX,
+  currencyDecimals,
+  formatAmountPlain,
+} from "@/features/reconciliation/lib/formatCents";
 
 interface Props {
   linkId: string;
   currentCents: number | null;
   currency: string | null;
-}
-
-function dollarsString(cents: number | null): string {
-  if (cents === null) return "";
-  const abs = Math.abs(cents);
-  const whole = Math.trunc(abs / 100);
-  const frac = (abs % 100).toString().padStart(2, "0");
-  return `${cents < 0 ? "-" : ""}${whole}.${frac}`;
 }
 
 export function PrintedTotalForm({ linkId, currentCents, currency }: Props) {
@@ -36,6 +32,14 @@ export function PrintedTotalForm({ linkId, currentCents, currency }: Props) {
     currency && currency.length > 0
       ? (CURRENCY_PREFIX[currency.toUpperCase()] ?? "")
       : "";
+  // Currency-aware input shape: KRW/JPY accept integers only, 2-decimal
+  // currencies accept an optional ".dd".
+  const decimals = currencyDecimals(currency);
+  const pattern =
+    decimals === 0 ? "^\\d*$" : `^(\\d+(\\.\\d{1,${decimals}})?)?$`;
+  const placeholder = decimals === 0 ? "132580" : "2208.50";
+  const defaultValue =
+    currentCents === null ? "" : formatAmountPlain(currentCents, currency);
   return (
     <details open={currentCents === null} className="border-t border-border">
       <summary className="px-4 py-3 cursor-pointer text-sm font-medium hover:bg-accent/50">
@@ -48,10 +52,10 @@ export function PrintedTotalForm({ linkId, currentCents, currency }: Props) {
           </span>
           <input
             name="printedTotal"
-            inputMode="decimal"
-            pattern="^(\d+(\.\d{1,2})?)?$"
-            defaultValue={dollarsString(currentCents)}
-            placeholder="2208.50"
+            inputMode={decimals === 0 ? "numeric" : "decimal"}
+            pattern={pattern}
+            defaultValue={defaultValue}
+            placeholder={placeholder}
             className="rounded border border-input bg-background px-2 py-1.5 text-sm tabular-nums"
           />
         </label>

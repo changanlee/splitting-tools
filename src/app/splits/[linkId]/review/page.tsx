@@ -145,7 +145,12 @@ export default async function ReviewPage({ params, searchParams }: Ctx) {
           // Story 2.3 — non-IRC row in edit mode → ReceiptLineEditForm
           if (editingLineId === l.id && !l.isIrc) {
             return (
-              <ReceiptLineEditForm key={l.id} linkId={linkId} line={l} />
+              <ReceiptLineEditForm
+                key={l.id}
+                linkId={linkId}
+                line={l}
+                currency={summary.currency}
+              />
             );
           }
           // Default — read-only row with optional edit anchor.
