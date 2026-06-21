@@ -79,6 +79,39 @@ describe("orphan IRC — kept, flagged, counted, never dropped (AC3/AC4)", () =>
   });
 });
 
+describe("positional fallback — code-less discount folds into the item above it", () => {
+  // Korean/positional receipts: discount printed under its item, no #code.
+  const r: ParsedReceipt = {
+    lines: [
+      line("農心 辛拉麵金", 9160, "농심 신라면골드"),
+      line("促銷折扣", -920, "★행사상품"),
+      line("Oreo 糖餅口味", 8960, "오레오 호떡맛"),
+      line("餅乾促銷折扣", -1800, "과자 할인 행사"),
+    ],
+  };
+  it("each code-less IRC attributes to the nearest preceding product; no orphans", () => {
+    const a = attributeIrc(r);
+    expect(a.lines[1].isIrc).toBe(true);
+    expect(a.lines[1].orphan).toBe(false);
+    expect(a.lines[1].ircAttributedTo).toBe(1); // 農心 lineNo
+    expect(a.lines[0].netCents).toBe(9160 - 920);
+    expect(a.lines[3].ircAttributedTo).toBe(3); // Oreo lineNo
+    expect(a.lines[2].netCents).toBe(8960 - 1800);
+    expect(a.lines.filter((l) => l.orphan).length).toBe(0);
+    expect(computeParsedSum(a)).toBe(grossSum(r));
+    expect(decomposed(r)).toBe(grossSum(r));
+  });
+
+  it("code-less IRC with no product above it stays orphan", () => {
+    const r2: ParsedReceipt = {
+      lines: [line("折扣", -100, "★할인"), line("X", 500, "x")],
+    };
+    const a = attributeIrc(r2);
+    expect(a.lines[0].orphan).toBe(true);
+    expect(a.lines[0].ircAttributedTo).toBeNull();
+  });
+});
+
 describe("edges: no IRC / all IRC / empty / cross-page order", () => {
   it("no IRC → identity (net == gross)", () => {
     const r: ParsedReceipt = {
