@@ -1,6 +1,6 @@
 # Story 8.1: 拍照認領（Phase 1）——拍實體商品照、視覺對應收據行、初步認領到本人
 
-Status: in-progress
+Status: review
 
 <!-- 來源：2026-06-21 brainstorming（長安「拍照後做初步的認領」）→ CIP 新增 Epic 8（additive，依賴 Epic 1 視覺邊界 + Epic 4 認領/身分）。Phase 1 = 本 story；Phase 2（精確件數、實物縮圖）見文末 deferred。 -->
 
@@ -38,10 +38,15 @@ so that 我不必逐行手動找自己的東西打勾——拍照即得初稿、
 - [x] **Task 0**（鐵則 2）：呼叫寫法參照已落地的 `verifyTranslations.ts`/`visionAdapter.ts`（OpenRouter raw fetch + 多圖 + json_schema + recordLlmCost），沿用同 pin、不開 web plugin。
 - [x] **Task 1**（AC3,AC4,AC8）：`src/features/claiming/photoMatch.ts`（純）——`ProductMatchSchema` + `PRODUCT_MATCH_JSON_SCHEMA` + `MATCH_CONFIDENCE_THRESHOLD=0.6` + `pickConfidentMatches()`；`photoMatch.test.ts` 7 測（合法/非法/門檻/absent/越界/dedupe/預設門檻）全綠。
 - [x] **Task 2**（AC2,AC6）：`src/lib/llm/matchProductsAdapter.ts`——第三個 LLM 邊界，單次多圖、`DEGRADATION_MODELS`、`buildAttemptPlan`/`backoffWithJitterMs`/`isRetryableStatus`、`recordLlmCost`、`response_format` json_schema、**不開 web plugin**；best-effort 回 `{matches:[]}`、永不 throw（NFR-R2）。typecheck/lint 綠。
-- [ ] **Task 3**（AC1,AC3,AC5）：`match` pg-boss queue + `matchWorker.ts`（比照 `parseWorker`：markStatus、resolve 不 throw、NFR-R2）；掛 `src/workers/index.ts`。 ← 整合層，待續
-- [ ] **Task 4**（AC1,AC4,AC7）：API route `POST /api/splits/[linkId]/claim-photos` + 狀態查詢；認領板「📷 拍照認領」入口（複用 1.2 capture/compress + 4-x 板元件）；結果回呈。 ← 整合層，待續
-- [ ] **Task 5**（AC4）：matchWorker 成功路徑用既有 `claimRepo`/`shareMath` seed 整行認領到 `identityId`（疊加非破壞）；初步標記決策（`claims.source` 欄 vs change-log）。 ← 整合層，待續
-- [ ] **Task 6**（AC8,AC9）：全 gate 綠 + 靜態掃描 + LLM Compliance 表 + deferred 登記。 ← 待整合層完成後
+- [x] **Task 3**（AC1,AC3,AC5）：`matchQueue.ts`（`MATCH_QUEUE` + `enqueueMatch`，仿 `queue.ts`）+ `matchWorker.ts`（仿 `parseWorker`：best-effort、resolve 不 throw、NFR-R2）；掛 `src/workers/index.ts`（parseWorker 之後 register）。
+- [x] **Task 4**（AC1,AC4）：API route `POST /api/splits/[linkId]/claim-photos`（access 不擋 friend；device-token authz；複用 parse budget seam 控成本；壓縮影像 base64→`enqueueMatch`；202）。認領板「📷 拍照認領」入口＝`PhotoClaimButton`（client，複用 1.2 `compressToCanvas`/`canvasToJpegBlob`，掛在 `ClaimBoardBody`，僅有綁定身分時顯示）。
+- [x] **Task 5**（AC4）：`claimRepo.seedClaims`（lineNo→claimable line id、`onConflictDoNothing` 疊加非破壞）+ `listClaimableLines`；matchWorker 成功路徑 `pickConfidentMatches`→`seedClaims` 到 `identityId`。初步標記決策：**v1 不加 `claims.source` 欄**（fire-and-forget，認領直接進板；是否區分 auto/manual → Phase 2）。
+- [x] **Task 6**（AC8,AC9）：`pnpm typecheck/lint/test(212+1todo)/build` 全綠；唯一 openrouter 邊界仍只在 `src/lib/llm/`；未換 model pin、未動 `src/db/schema.ts`。
+
+### ⚠️ 誠實範圍調整（dev 決策，非 silent）
+
+- **AC7 部分達成**：實作了「高信心→自動整行認領」（AC4），但採 **fire-and-forget**（worker seed 進 `claims`，board 重整即見），**未做**獨立的「待確認低信心清單」UI 與即時 polling。理由：避免新增 `match_jobs` 狀態表 + 輪詢元件（大幅縮小 v1 範圍）。低信心項＝不自動認領、使用者照舊手動認領。→「待確認清單 + 即時 polling」併入 Phase 2 / 沿用 `W-4-8-1`。
+- **成本控制**：複用既有 `checkParseBudget`（per-session/IP 每日影像額度）＝ AC9 item7 ✅（共用解析的每日額度）。
 
 ## Dev Notes
 
@@ -102,7 +107,22 @@ so that 我不必逐行手動找自己的東西打勾——拍照即得初稿、
 - `src/features/claiming/photoMatch.ts`（A：純比對契約 + 門檻選擇器）
 - `src/features/claiming/photoMatch.test.ts`（A：7 node 測）
 - `src/lib/llm/matchProductsAdapter.ts`（A：第三個 LLM 視覺邊界）
+- `src/features/claiming/server/matchQueue.ts`（A：match pg-boss producer）
+- `src/workers/matchWorker.ts`（A：match consumer → seed claims）
+- `src/workers/index.ts`（M：register matchWorker）
+- `src/features/claiming/server/claimRepo.ts`（M：+`listClaimableLines`/`seedClaims`）
+- `src/app/api/splits/[linkId]/claim-photos/route.ts`（A：上傳 → enqueue match）
+- `src/features/claiming/components/PhotoClaimButton.tsx`（A：拍照認領 client 入口）
+- `src/features/claiming/components/ClaimBoardBody.tsx`（M：掛 PhotoClaimButton）
 - `_bmad-output/implementation-artifacts/{8-1-...md, sprint-status.yaml}`（A/M）
+
+### Completion Notes（dev-story 完成）
+
+- 2026-06-21 全 Task 完成、gate 全綠（typecheck/lint/212 測試+1todo/build）。
+- 唯一 LLM 邊界仍只在 `src/lib/llm/`（新增第三個 adapter）；**未換 model pin**、**未動 DB schema**。
+- **AC↔測試映射**：AC3/AC4 純邏輯（`ProductMatchSchema`/`pickConfidentMatches`）→ `photoMatch.test.ts` 7 測；AC1/AC2/AC5/AC6（LLM adapter / matchWorker / queue / route / claim seed / UI）＝整合層，依 AC8 不入 node（型別+build+靜態掃描 + `W-8-1-1` runtime）。
+- **Deferred**：`W-8-1-1`（真 LLM runtime + 比對準確率，需 VPS 有效 key，不謊報）；Phase 2（精確件數、實物縮圖、待確認清單 + 即時 polling）。
+- **未跑 live**：本機無有效 key；部署到 VPS 後用真 key 實測比對準確率（同 W-1-4-1 模式）。
 
 ### Deferred / Follow-ups
 
