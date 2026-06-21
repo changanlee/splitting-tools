@@ -44,9 +44,10 @@ const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_TOKENS = 2_000;
 
 const SYSTEM_INSTRUCTION =
-  "你是收據品名校正員。會給你幾筆收據品項，每筆有 index、rawText（原始外語文字）、description（暫譯繁中）。" +
-  "請用網路搜尋查出每筆「正確、通用」的繁體中文品名（品牌＋品項），品牌名保留可辨識。" +
-  "查得到官方／通用譯名就用它；查不到就沿用原本的 description，不要亂猜。" +
+  "你是收據品名校正員。會給你幾筆品項，每筆有 index、rawText（原始外語）、description（暫譯）。" +
+  "用網路搜尋查出每筆「正確、通用」的繁體中文品名（品牌＋品項）。" +
+  "輸出規則：description 必須是純繁體中文，【品牌也要翻成通用中文譯名或改用英文】（例：오뚜기→不倒翁、크라운→皇冠、종가→宗家、덴마크→丹麥、남양→南陽、이너케어→Inner Care），" +
+  "【絕對不可包含任何韓文諺文或日文假名等原文字元】；即使查不到官方譯名，也要給出合理的繁中翻譯，不可沿用外文原字。" +
   "務必對【每一個輸入 index】都回一筆 results（index 原樣帶回，description 為最終繁中品名）。" +
   "只輸出符合 JSON schema 的結果，不要加任何解釋或引用標記。";
 
@@ -152,7 +153,7 @@ export async function verifyTranslations(
         body: JSON.stringify({
           model,
           max_tokens: MAX_TOKENS,
-          plugins: [{ id: "web", max_results: 5 }],
+          plugins: [{ id: "web", max_results: 3 }],
           messages: [
             { role: "system", content: SYSTEM_INSTRUCTION },
             { role: "user", content: userPayload },
