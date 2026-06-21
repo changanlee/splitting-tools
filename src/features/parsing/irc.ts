@@ -97,14 +97,31 @@ export function attributeIrc(parsed: ParsedReceipt): AttributedReceipt {
     al.isIrc = true;
     al.claimable = false; // IRC is never independently claimable (AC1)
     const code = ircRefCode(l);
-    const parent = code ? parentByCode.get(code) : undefined;
+    let parent = code ? parentByCode.get(code) : undefined;
+    // Positional fallback (2026-06-21, foreign receipts): many receipts
+    // (Korean/Japanese promos, e.g. "★행사상품 -920") print the discount
+    // line directly UNDER the item it applies to, with NO #code
+    // cross-reference, so code matching can't find a parent. Attribute
+    // such a code-less IRC to the nearest preceding non-IRC product line.
+    // Guard on `code === null`: a line that HAS a code but matched nothing
+    // is a genuine orphan in the code-based (#5564) format — leave it so,
+    // because there position does NOT imply parenthood.
+    if (!parent && code === null) {
+      for (let j = i - 1; j >= 0; j--) {
+        if (!isIrcLine(parsed.lines[j])) {
+          parent = lines[j];
+          break;
+        }
+      }
+    }
     if (parent) {
       al.ircAttributedTo = parent.lineNo;
       al.orphan = false;
       parent.netCents += l.amountCents; // amount is negative
     } else {
       // Orphan IRC: kept, counted, flagged — never dropped, never
-      // mis-accounted (AC3; Epic 2 reconciliation can re-bind).
+      // mis-accounted (AC3; Epic 2 reconciliation can re-bind). Now only
+      // when a coded IRC misses, or a code-less one has no item above it.
       al.ircAttributedTo = null;
       al.orphan = true;
     }

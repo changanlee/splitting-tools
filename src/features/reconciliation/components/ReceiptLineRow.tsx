@@ -64,9 +64,7 @@ export function ReceiptLineRow({
       >
         <span className="flex-1">
           {line.orphan ? (
-            <>
-              孤兒 IRC（尚未對應母品項 — 由 Story 2.4 處理改綁）
-            </>
+            <>未對應的折扣（可點「改綁」指定品項）</>
           ) : (
             <>折抵</>
           )}
