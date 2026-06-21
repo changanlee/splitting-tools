@@ -39,6 +39,23 @@ describe("parseCentsInput — integer cents from human input", () => {
     expect(parseCentsInput("100.555")).toBeNull();
     expect(parseCentsInput("0.999")).toBeNull();
   });
+
+  // 2026-06-21 currency-aware: KRW/JPY have 0 decimals.
+  it("zero-decimal currency (KRW): integer is the amount, no ×100", () => {
+    expect(parseCentsInput("132580", "KRW")).toBe(132580);
+    expect(parseCentsInput("4,980", "KRW")).toBe(4980);
+    expect(parseCentsInput("0", "JPY")).toBe(0);
+  });
+
+  it("zero-decimal currency rejects a decimal point", () => {
+    expect(parseCentsInput("4980.5", "KRW")).toBeNull();
+    expect(parseCentsInput("100.00", "JPY")).toBeNull();
+  });
+
+  it("2-decimal currency still scales by 100 (explicit + default)", () => {
+    expect(parseCentsInput("16.50", "USD")).toBe(1650);
+    expect(parseCentsInput("16.50")).toBe(1650); // default = 2
+  });
 });
 
 describe("parseQtyInput — strictly positive integer", () => {

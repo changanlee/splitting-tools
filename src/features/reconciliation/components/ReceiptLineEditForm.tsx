@@ -11,27 +11,25 @@ import {
   deleteLineAction,
   editLineAction,
 } from "@/features/reconciliation/server/actions";
+import {
+  currencyDecimals,
+  formatAmountPlain,
+} from "@/features/reconciliation/lib/formatCents";
 import type { ReceiptLineView } from "@/features/reconciliation/server/summary";
 
 interface Props {
   linkId: string;
   line: ReceiptLineView;
+  /** Session ISO 4217 — drives the amount field's decimals (KRW=0). */
+  currency: string | null;
 }
 
-function dollarsString(cents: number): string {
-  // Inverse of parseCentsInput for the prefilled value; integer cents
-  // → "X.XX" form fields' default. Negative kept as-is for IRC rows;
-  // 2-3 only mutates non-IRC lines but the input must round-trip.
-  const negative = cents < 0;
-  const abs = Math.abs(cents);
-  const whole = Math.trunc(abs / 100);
-  const frac = (abs % 100).toString().padStart(2, "0");
-  return `${negative ? "-" : ""}${whole}.${frac}`;
-}
-
-export function ReceiptLineEditForm({ linkId, line }: Props) {
+export function ReceiptLineEditForm({ linkId, line, currency }: Props) {
   const editBound = editLineAction.bind(null, linkId, line.id);
   const deleteBound = deleteLineAction.bind(null, linkId, line.id);
+  const decimals = currencyDecimals(currency);
+  const amountPattern =
+    decimals === 0 ? "^\\d+$" : `^\\d+(\\.\\d{1,${decimals}})?$`;
 
   return (
     <li
@@ -72,9 +70,9 @@ export function ReceiptLineEditForm({ linkId, line }: Props) {
             <span className="text-xs text-muted-foreground">金額</span>
             <input
               name="amount"
-              inputMode="decimal"
-              pattern="^\d+(\.\d{1,2})?$"
-              defaultValue={dollarsString(line.grossCents)}
+              inputMode={decimals === 0 ? "numeric" : "decimal"}
+              pattern={amountPattern}
+              defaultValue={formatAmountPlain(line.grossCents, currency)}
               required
               className="rounded border border-input bg-background px-2 py-1.5 text-sm tabular-nums"
             />

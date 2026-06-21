@@ -50,6 +50,25 @@ async function assertSession(linkId: string): Promise<void> {
 }
 
 /**
+ * Best-effort read of the session's ISO 4217 currency so typed amounts are
+ * scaled to the right minor units (KRW has 0 decimals, USD 2). Swallows
+ * errors → null (defaults to 2 decimals); the action's own assertSession
+ * still surfaces a missing session / real DB fault with a friendly error.
+ */
+async function sessionCurrency(linkId: string): Promise<string | null> {
+  try {
+    const rows = await db
+      .select({ currency: sessions.currency })
+      .from(sessions)
+      .where(eq(sessions.id, linkId))
+      .limit(1);
+    return rows[0]?.currency ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Re-fold every line's `net_cents` (and IRC orphan flags) from the
  * current `gross_cents` + `irc_attributed_to` graph. Run after any
  * edit/add/delete so a parent's IRC discount is never silently lost
@@ -84,7 +103,10 @@ export async function editLineAction(
   const description = parseDescription(String(formData.get("description") ?? ""));
   const qty = parseQtyInput(String(formData.get("qty") ?? ""));
   const shareCount = parseQtyInput(String(formData.get("shareCount") ?? ""));
-  const cents = parseCentsInput(String(formData.get("amount") ?? ""));
+  const cents = parseCentsInput(
+    String(formData.get("amount") ?? ""),
+    await sessionCurrency(linkId),
+  );
 
   if (
     description === null ||
@@ -163,7 +185,10 @@ export async function addLineAction(
 ): Promise<void> {
   const description = parseDescription(String(formData.get("description") ?? ""));
   const qty = parseQtyInput(String(formData.get("qty") ?? ""));
-  const cents = parseCentsInput(String(formData.get("amount") ?? ""));
+  const cents = parseCentsInput(
+    String(formData.get("amount") ?? ""),
+    await sessionCurrency(linkId),
+  );
 
   if (description === null || qty === null || cents === null) {
     throw new Error(FRIENDLY_INVALID);
@@ -305,7 +330,7 @@ export async function setPrintedTotalAction(
   if (raw === "") {
     printedTotalCents = null;
   } else {
-    printedTotalCents = parseCentsInput(raw);
+    printedTotalCents = parseCentsInput(raw, await sessionCurrency(linkId));
     if (printedTotalCents === null) throw new Error(FRIENDLY_INVALID);
   }
 
