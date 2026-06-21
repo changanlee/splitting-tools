@@ -12,6 +12,30 @@
 
 ---
 
+## W-8-1-2 — Photo-claim: re-parse lineNo scoping + redelivery cost dedupe
+
+- **Status:** OPEN
+- **Priority:** P2
+- **Story:** 8.1 photo-assisted claim (code-review 2026-06-21)
+- **Gap:**
+  1. **lineNo not session-unique.** `receipt_lines.line_no` is unique per
+     `parse_job_id`, not per session. `seedClaims`/`listClaimableLines`
+     resolve `lineNo→id` across all session rows; a re-parsed session (two
+     line sets, overlapping lineNo) could mis-map. Mitigated NOW by a
+     fail-safe: `seedClaims` DROPS any ambiguous (duplicate) lineNo rather
+     than risk the wrong line. Deeper fix = scope both reads to the active
+     parse job, or thread `receiptLineId` end-to-end. Latent today (no
+     re-parse UI; rest of app already reads receipt_lines by sessionId).
+  2. **Redelivery double-cost.** matchWorker swallows errors + resolves so
+     pg-boss never job-retries; a crash mid-handler / visibility-timeout
+     redelivery re-invokes the paid vision call (`llm_costs` double-charge).
+     `seedClaims` is idempotent (`onConflictDoNothing`). Acceptable v1
+     (rare); a `jobId` dedupe guard would close it.
+- **Trigger to resolve:** a re-parse/correct-receipt UI lands (1); or
+  `llm_costs` shows material redelivery double-charges (2).
+
+---
+
 ## W-VERIFY-1 — Foreign-receipt web-verify pass: live-LLM + plugin migration
 
 - **Status:** OPEN

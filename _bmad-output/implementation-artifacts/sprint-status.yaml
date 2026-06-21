@@ -136,4 +136,4 @@ development_status:
   # 依賴 Epic 1（視覺邊界）+ Epic 4（認領/身分），不 retrofit。Phase 1 = 整行
   # 初步認領（純文字對應，不需新影像儲存）；Phase 2（精確件數 + 實物縮圖）未排。
   epic-8: in-progress  # started 2026-06-21
-  8-1-photo-assisted-claim: review  # dev complete 2026-06-21 — gate green 212+1todo; live verify W-8-1-1
+  8-1-photo-assisted-claim: done  # dev+review 2026-06-21 — P0x2+P1x2 fixed; gate green 212+1todo; live W-8-1-1

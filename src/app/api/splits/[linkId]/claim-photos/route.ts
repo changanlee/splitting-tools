@@ -19,6 +19,10 @@ import { sessionExists } from "@/features/parsing/server/jobs";
 import { enqueueMatch } from "@/features/claiming/server/matchQueue";
 import { findIdentityForToken } from "@/features/identity/server/identityRepo";
 import { isValidDeviceToken } from "@/features/identity/deviceToken";
+import { FRIENDLY_FROZEN, isFrozen } from "@/features/settlement/freeze";
+import { db } from "@/lib/db/client";
+import { sessions } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { extractClientIp, sha256IpKey } from "@/lib/rateLimit.server";
 import { isValidLinkId } from "@/lib/linkId";
 
@@ -86,6 +90,17 @@ export async function POST(
   const identity = await findIdentityForToken(linkId, rawToken);
   if (!identity) {
     return err("AUTH", "請先選擇你的身份再使用拍照認領。", 401);
+  }
+
+  // Story 5.5 — refuse once the session is finalized (read-only). Mirrors
+  // the freeze guard on every other claim write; the worker re-checks too.
+  const statusRows = await db
+    .select({ status: sessions.status })
+    .from(sessions)
+    .where(eq(sessions.id, linkId))
+    .limit(1);
+  if (statusRows[0] && isFrozen(statusRows[0].status)) {
+    return err("FROZEN", FRIENDLY_FROZEN, 409);
   }
 
   // Bound LLM cost via the existing per-session/IP daily image budget.

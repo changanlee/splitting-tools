@@ -8,6 +8,7 @@ import { and, asc, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db/client";
 import { claims, identities, receiptLines } from "@/db/schema";
+import { appendChange } from "@/features/claiming/server/changeLog";
 
 export interface ClaimRow {
   id: string;
@@ -106,8 +107,22 @@ export async function seedClaims(args: {
         eq(receiptLines.claimable, true),
       ),
     );
-  const idByLineNo = new Map(rows.map((r) => [r.lineNo, r.id]));
+  // FAIL-SAFE on ambiguous lineNo: `line_no` is unique per parse_job, not
+  // per session — a re-parsed session could carry two rows with the same
+  // lineNo. Rather than risk claiming the WRONG line, drop any lineNo that
+  // resolves to more than one row. (Deeper fix = scope to the active parse
+  // job → deferred W-8-1-2.)
+  const idByLineNo = new Map<number, string>();
+  const ambiguous = new Set<number>();
+  for (const r of rows) {
+    if (idByLineNo.has(r.lineNo)) {
+      ambiguous.add(r.lineNo);
+      continue;
+    }
+    idByLineNo.set(r.lineNo, r.id);
+  }
   const values = args.lineNos
+    .filter((n) => !ambiguous.has(n))
     .map((n) => idByLineNo.get(n))
     .filter((id): id is string => id != null)
     .map((receiptLineId) => ({
@@ -124,7 +139,19 @@ export async function seedClaims(args: {
     .onConflictDoNothing({
       target: [claims.receiptLineId, claims.identityId],
     })
-    .returning({ id: claims.id });
+    .returning({ receiptLineId: claims.receiptLineId });
+  // Audit + undoability (Story 4.6/4.9): a change-log row per newly
+  // seeded claim, so undoLastClaimAction can reverse a wrong auto-claim
+  // and the payer audit trail captures photo-sourced claims.
+  for (const row of inserted) {
+    await appendChange({
+      sessionId: args.sessionId,
+      receiptLineId: row.receiptLineId,
+      identityId: args.identityId,
+      action: "claim",
+      details: { source: "photo" },
+    });
+  }
   return inserted.length;
 }
 

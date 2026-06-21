@@ -1,6 +1,6 @@
 # Story 8.1: 拍照認領（Phase 1）——拍實體商品照、視覺對應收據行、初步認領到本人
 
-Status: review
+Status: done
 
 <!-- 來源：2026-06-21 brainstorming（長安「拍照後做初步的認領」）→ CIP 新增 Epic 8（additive，依賴 Epic 1 視覺邊界 + Epic 4 認領/身分）。Phase 1 = 本 story；Phase 2（精確件數、實物縮圖）見文末 deferred。 -->
 
@@ -128,3 +128,15 @@ so that 我不必逐行手動找自己的東西打勾——拍照即得初稿、
 
 - **W-8-1-1**（P1）：真 LLM runtime 驗證——本機 `.env` key 失效史（見 [[openrouter-key-on-vps]]），有效 key 在 VPS；比對準確率須以真 key 實測（比照 `W-1-4-1`，不謊報）。
 - **Phase 2（Story 8-2，未排）**：①精確件數分配（同款多件、誰拿幾件）；②每行掛實物縮圖（需影像儲存/CDN 基礎建設）。
+
+## Code Review（2026-06-21，full 模式，3 hunters：Blind / Edge Case / Acceptance Auditor）
+
+> 結論：合規面全綠（單一 LLM 邊界、未換 pin、未動 schema、NFR-L4/R2、LLM-Ops、authz、cost seam 均經 file:line 驗證）。發現 P0×2 + P1×2，已全數修復；揭露的 AC7 範圍裁剪經 Auditor 確認「與程式一致、非隱藏偏差」。
+
+- [x] **[P0] 凍結 session 可被拍照認領寫入**（繞過 isFrozen 閘門）→ 修：route 早退 409 `FRIENDLY_FROZEN` + matchWorker 寫入前再查 status（權威守衛，涵蓋 enqueue 後才凍結的時間窗），凍結即跳過、連 LLM 都不呼叫。
+- [x] **[P0] 自動認領對 undo/audit 隱形**（seedClaims 未寫 change-log）→ 修：seedClaims 對每筆實際插入的認領 `appendChange(action:"claim", details:{source:"photo"})`；undoLastClaimAction 可反轉、4.9 audit trail 完整。
+- [x] **[P1] MAX_TOKENS=4000 長收據截斷→靜默 0 認領** → 修：→16000（同 visionAdapter）。
+- [x] **[P1] lineNo 跨 parse_job 不唯一→重解析可能認錯行** → 修：seedClaims 對重複 lineNo **fail-safe 丟棄**（寧可不認也不認錯）；深層 job-scoping 記 `W-8-1-2`（latent，今日無 re-parse UI）。
+- [接受] **AC7 待確認清單 + 即時 polling**：誠實裁剪為 fire-and-forget，Auditor 確認程式與揭露一致 → Phase 2。
+- [Note] redelivery 重複計費（crash 中途重投，罕見）→ `W-8-1-2`；needsConfirm 計算後未用 → Phase 2。
+- 驗證：typecheck/lint/**212 測試+1todo**/build 全綠。唯一 openrouter 邊界仍只在 `src/lib/llm/`。

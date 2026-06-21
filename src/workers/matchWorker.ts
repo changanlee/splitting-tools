@@ -12,6 +12,11 @@
  */
 import type { PgBoss } from "pg-boss";
 
+import { eq } from "drizzle-orm";
+
+import { db } from "@/lib/db/client";
+import { sessions } from "@/db/schema";
+import { isFrozen } from "@/features/settlement/freeze";
 import { pickConfidentMatches } from "@/features/claiming/photoMatch";
 import {
   listClaimableLines,
@@ -39,6 +44,17 @@ export async function registerMatchWorker(boss: PgBoss): Promise<void> {
           continue;
         }
         try {
+          // Story 5.5 read-only-after-finalize: never seed claims onto a
+          // frozen session (the route also rejects, but freeze can land
+          // between enqueue and processing — this is the authoritative
+          // write-time guard). Skip before the paid LLM call.
+          const sess = await db
+            .select({ status: sessions.status })
+            .from(sessions)
+            .where(eq(sessions.id, d.sessionId))
+            .limit(1);
+          if (!sess[0] || isFrozen(sess[0].status)) continue;
+
           const lines = await listClaimableLines(d.sessionId);
           if (lines.length === 0) continue; // nothing to claim against
           const { matches } = await matchProductsToLines(

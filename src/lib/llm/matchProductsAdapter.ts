@@ -35,7 +35,10 @@ import {
 } from "@/lib/llm/retry";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const MAX_TOKENS = 4_000;
+// One small match object per receipt line; a long multi-page receipt can
+// have dozens of lines, so 16K (matches visionAdapter) avoids truncating
+// the JSON to zero usable matches on exactly the long-receipt case.
+const MAX_TOKENS = 16_000;
 
 const SYSTEM_INSTRUCTION =
   "你是收據認領助手。會給你幾張使用者拿走的實體商品照片，以及同一張收據的逐行品項清單（每筆有 lineNo 與品名）。" +
