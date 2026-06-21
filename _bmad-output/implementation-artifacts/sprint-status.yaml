@@ -56,7 +56,7 @@
 #   each story states its own Drizzle schema DDL.
 
 generated: 2026-05-19
-last_updated: 2026-05-22T12:00
+last_updated: 2026-06-21T10:00
 project: splitting_tools
 project_key: NOKEY
 tracking_system: file-system
@@ -130,3 +130,10 @@ development_status:
   # 的帳號，來讓他可以有使用權」.
   epic-7: done  # 2026-05-22 — access-code gating
   7-1-access-code-gate: done  # access_codes table + /unlock redeem + home/API gate + /admin manage
+
+  # ---- Epic 8: 拍照認領（photo-assisted claiming）----
+  # CIP 2026-06-21: brainstorming「拍照後做初步認領」(option 1+2)。Additive —
+  # 依賴 Epic 1（視覺邊界）+ Epic 4（認領/身分），不 retrofit。Phase 1 = 整行
+  # 初步認領（純文字對應，不需新影像儲存）；Phase 2（精確件數 + 實物縮圖）未排。
+  epic-8: in-progress  # started 2026-06-21
+  8-1-photo-assisted-claim: ready-for-dev  # created 2026-06-21 — vision match → 整行初步認領 to self
