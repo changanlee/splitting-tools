@@ -1,13 +1,13 @@
-# 部署 — 香港 VPS
+# 部署 — 馬來西亞 VPS（Hostinger）
 
-分帳小工具的正式部署。**香港**是唯一同時滿足兩個條件的地點：
+> **目前線上實況（2026-06-21）**：正式環境跑在 **Hostinger 馬來西亞 VPS（`187.77.133.21`）**，與其他 app（Speech / Plutus / Kairos…）**共置（colocated）**，共用主機上一個 Caddy 反向代理。部署目錄 `/root/splitting-tools`，用 **`docker-compose.yml + docker-compose.colocate.yml`**（colocate 版**不含自己的 Caddy**）。下面 §1–§8 是「從零開一台機」的單機版（自帶 Caddy，用 `prod.yml`）——共置機請改用 §「之後更新」的 colocate 指令。
 
-- 中國大陸**連得到**（境外、免 ICP 備案、延遲低）。
-- **開放網路** → worker 連得到 `openrouter.ai`（視覺 LLM）。
+選址條件（為何不是香港）：
 
-（大陸境內 VPS 需 ICP 備案 _且_ 連不到 OpenRouter；歐美 VPS 連得到 OpenRouter 但對中國慢。）
+- worker 需要 **開放網路** 連得到 `openrouter.ai`（視覺 LLM）。
+- **香港已棄用**：Anthropic 對該地區封鎖，OpenRouter→Anthropic 連不通。改用馬來西亞（Anthropic 開放、延遲可接受）。**選機房前務必先查 LLM 供應商是否開放該地區**。
 
-LLM 呼叫是 server 端（worker → OpenRouter）——中國使用者只載入你 VPS 的網頁，從不直接碰 OpenRouter。
+LLM 呼叫是 server 端（worker → OpenRouter）——使用者只載入你 VPS 的網頁，從不直接碰 OpenRouter。
 
 ---
 
@@ -86,6 +86,22 @@ Caddy 首次啟動會自動為 `SPLIT_DOMAIN` 申請 + 安裝 Let's Encrypt HTTP
 ---
 
 ## 之後更新
+
+**共置機（目前線上，馬來西亞）** — 在 `/root/splitting-tools`：
+
+```sh
+git fetch origin
+# 若 VPS 對 compose 檔有本機改動（如 db healthcheck），先確認 diff 再決定保留/丟棄
+git pull --ff-only origin main
+docker compose -f docker-compose.yml -f docker-compose.colocate.yml up -d --build
+# 驗證（worker 啟動時會自動跑 drizzle migrate）：
+docker compose -f docker-compose.yml -f docker-compose.colocate.yml logs --tail=30 worker
+# 預期：database reachable → drizzle migrate complete → pg-boss started → parseWorker registered
+```
+
+> ⚠️ **絕不要對 caddy 容器下 `docker logs`**：該機 dockerd 開了 live-restore，`docker logs` 撞上 caddy 的 rotating log 會卡死 dockerd goroutine，只能 `systemctl restart docker` 解。只看 `worker` / `web` 的 log。
+
+**單機版（自帶 Caddy）**：
 
 ```sh
 git pull
