@@ -19,6 +19,7 @@ import {
   type LineForShare,
 } from "@/features/claiming/shareMath";
 import { ClaimRow } from "@/features/claiming/components/ClaimRow";
+import { PhotoClaimButton } from "@/features/claiming/components/PhotoClaimButton";
 import { undoLastClaimAction } from "@/features/claiming/server/actions";
 import {
   addPersonAction,
@@ -138,6 +139,12 @@ export function ClaimBoardBody({
 
   return (
     <section className="flex flex-col gap-3">
+      {/* Story 8.1 — photo-assisted claim, only for a bound self-identity. */}
+      {myIdentityId ? (
+        <div className="overflow-hidden rounded-md border border-primary/30 bg-primary/5">
+          <PhotoClaimButton linkId={linkId} />
+        </div>
+      ) : null}
       {addedName ? (
         <p
           role="status"
