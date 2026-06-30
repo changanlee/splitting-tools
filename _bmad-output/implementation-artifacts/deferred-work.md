@@ -12,6 +12,32 @@
 
 ---
 
+## W-8-1-1 — Photo-claim: live vision-match accuracy
+
+- **Status:** PARTIALLY VERIFIED (2026-06-30) — external path proven live;
+  recall imperfect; full UI→worker→board e2e still un-driven.
+- **Priority:** P1
+- **Story:** 8.1 photo-assisted claim
+- **Live result (2026-06-30, real key, real product photo `401.jpeg` vs
+  the deployed receipt's claimable lines, deployed prompt + 0.6 threshold,
+  `anthropic/claude-sonnet-4.6`, $0.0127):** the vision match WORKS —
+  returned schema-valid all-Chinese matches and auto-claimed 4 sensible
+  items (不倒翁芝麻拉麵 0.82 / 農心辛拉麵黑 0.92 / 南陽 Inner Care 0.75 /
+  丹麥優格 0.80). **BUT recall is imperfect:** 辛拉麵金 (GOLD ×2) is
+  visibly in the photo + on the receipt yet was marked present=false
+  (missed). Confirms the "preliminary draft, user adjusts" positioning is
+  correct — lowering the threshold can't fix a present=false miss (vision
+  limit).
+- **Still open:** (a) full end-to-end through the real UI (capture →
+  compress → route → matchWorker → seedClaims → board badge) not driven —
+  can't headless-test the browser flow; (b) recall tuning — a prompt hint
+  for same-brand multi-variant packs (BLACK vs GOLD) might raise recall;
+  evaluate if users report misses.
+- **Trigger to resolve:** user dogfood of the live feature; or a recall
+  complaint → prompt-tune + re-measure.
+
+---
+
 ## W-8-1-2 — Photo-claim: re-parse lineNo scoping + redelivery cost dedupe
 
 - **Status:** OPEN
