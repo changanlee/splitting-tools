@@ -43,6 +43,11 @@ const MAX_TOKENS = 16_000;
 const SYSTEM_INSTRUCTION =
   "你是收據認領助手。會給你幾張使用者拿走的實體商品照片，以及同一張收據的逐行品項清單（每筆有 lineNo 與品名）。" +
   "判斷清單上【每一個 lineNo】的品項是否出現在照片中，以及你的把握度。" +
+  // 2026-06-30 recall tuning (W-8-1-1): the un-hinted prompt missed a
+  // same-brand variant (辛拉麵金/GOLD sitting next to 辛拉麵黑/BLACK).
+  // Live re-test on the failing photo: GOLD then caught at 0.9, no
+  // regression on the other matches.
+  "【重要：同一品牌常有多種口味／版本（例如辛拉麵分『黑/Black』與『金/Gold』；同款也可能有多包並排）——請逐一看清楚照片中每個包裝的文字與顏色，不要只認出其中一種就略過同品牌的其他版本。】" +
   "輸出 matches：對每個輸入 lineNo 回一筆 {lineNo（原樣帶回）, present（照片是否看得到該品項，布林）, confidence（0~1）}。" +
   "只對清單裡出現的 lineNo 作答，不要自創 lineNo。包裝外語沒關係，用品名語意比對。" +
   "只輸出符合 JSON schema 的結果，不要加任何解釋或引用標記。";
