@@ -28,11 +28,15 @@
   (missed). Confirms the "preliminary draft, user adjusts" positioning is
   correct — lowering the threshold can't fix a present=false miss (vision
   limit).
+- **Recall tuning APPLIED (2026-06-30):** added a same-brand-multi-variant
+  hint to the match prompt; live re-test on the SAME failing photo →
+  辛拉麵金 (GOLD) now caught at 0.9, the other 4 matches unchanged, cost
+  flat ($0.013). n=1 (one labelled photo) — positive signal, not proof.
 - **Still open:** (a) full end-to-end through the real UI (capture →
   compress → route → matchWorker → seedClaims → board badge) not driven —
-  can't headless-test the browser flow; (b) recall tuning — a prompt hint
-  for same-brand multi-variant packs (BLACK vs GOLD) might raise recall;
-  evaluate if users report misses.
+  can't headless-test the browser flow; (b) broader recall measurement
+  beyond n=1 → build a small labelled photo eval set if usage grows
+  (candidate for the `agent-regression` harness).
 - **Trigger to resolve:** user dogfood of the live feature; or a recall
   complaint → prompt-tune + re-measure.
 
